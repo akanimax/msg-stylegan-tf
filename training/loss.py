@@ -17,7 +17,7 @@ from dnnlib.tflib.autosummary import autosummary
 def fp32(*values):
     if len(values) == 1 and isinstance(values[0], tuple):
         values = values[0]
-    values = tuple(tf.cast(v, tf.float32) for v in values)
+    values = tuple([tf.cast(v, tf.float32) for v in values])
     return values if len(values) >= 2 else values[0]
 
 #----------------------------------------------------------------------------
@@ -132,7 +132,7 @@ def G_logistic_nonsaturating(G, D, opt, training_set, minibatch_size): # pylint:
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = training_set.get_random_labels_tf(minibatch_size)
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    fake_scores_out = fp32(D.get_output_for(fake_images_out, labels, is_training=True))
+    fake_scores_out = fp32(D.get_output_for(*fake_images_out, labels, is_training=True))
     loss = tf.nn.softplus(-fake_scores_out)  # -log(logistic(fake_scores_out))
     return loss
 
@@ -150,8 +150,8 @@ def D_logistic(G, D, opt, training_set, minibatch_size, reals, labels): # pylint
 def D_logistic_simplegp(G, D, opt, training_set, minibatch_size, reals, labels, r1_gamma=10.0, r2_gamma=0.0): # pylint: disable=unused-argument
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     fake_images_out = G.get_output_for(latents, labels, is_training=True)
-    real_scores_out = fp32(D.get_output_for(reals, labels, is_training=True))
-    fake_scores_out = fp32(D.get_output_for(fake_images_out, labels, is_training=True))
+    real_scores_out = fp32(D.get_output_for(*reals, labels, is_training=True))
+    fake_scores_out = fp32(D.get_output_for(*fake_images_out, labels, is_training=True))
     real_scores_out = autosummary('Loss/scores/real', real_scores_out)
     fake_scores_out = autosummary('Loss/scores/fake', fake_scores_out)
     loss = tf.nn.softplus(fake_scores_out)  # -log(1 - logistic(fake_scores_out))
@@ -160,16 +160,16 @@ def D_logistic_simplegp(G, D, opt, training_set, minibatch_size, reals, labels, 
     if r1_gamma != 0.0:
         with tf.name_scope('R1Penalty'):
             real_loss = opt.apply_loss_scaling(tf.reduce_sum(real_scores_out))
-            real_grads = opt.undo_loss_scaling(fp32(tf.gradients(real_loss, [reals])[0]))
-            r1_penalty = tf.reduce_sum(tf.square(real_grads), axis=[1,2,3])
+            real_grads = [opt.undo_loss_scaling(real_grad) for real_grad in fp32(*tf.gradients(real_loss, reals))]
+            r1_penalty = tf.reduce_mean([tf.reduce_sum(tf.square(real_grad), axis=[1,2,3]) for real_grad in real_grads])
             r1_penalty = autosummary('Loss/r1_penalty', r1_penalty)
         loss += r1_penalty * (r1_gamma * 0.5)
 
     if r2_gamma != 0.0:
         with tf.name_scope('R2Penalty'):
             fake_loss = opt.apply_loss_scaling(tf.reduce_sum(fake_scores_out))
-            fake_grads = opt.undo_loss_scaling(fp32(tf.gradients(fake_loss, [fake_images_out])[0]))
-            r2_penalty = tf.reduce_sum(tf.square(fake_grads), axis=[1,2,3])
+            fake_grads = [opt.undo_loss_scaling(fake_grad) for fake_grad in fp32(*tf.gradients(fake_loss, [fake_images_out]))]
+            r2_penalty = tf.reduce_mean([tf.reduce_sum(tf.square(fake_grad), axis=[1,2,3]) for fake_grad in fake_grads])
             r2_penalty = autosummary('Loss/r2_penalty', r2_penalty)
         loss += r2_penalty * (r2_gamma * 0.5)
     return loss

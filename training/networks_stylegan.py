@@ -1,11 +1,4 @@
-﻿# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
-#
-# This work is licensed under the Creative Commons Attribution-NonCommercial
-# 4.0 International License. To view a copy of this license, visit
-# http://creativecommons.org/licenses/by-nc/4.0/ or send a letter to
-# Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
-
-"""Network architectures used in the StyleGAN paper."""
+﻿"""Network architectures used for the MSG-StyleGAN :)"""
 
 import numpy as np
 import tensorflow as tf
@@ -96,8 +89,8 @@ def _downscale2d(x, factor=2, gain=1):
 def blur2d(x, f=[1,2,1], normalize=True):
     with tf.variable_scope('Blur2D'):
         @tf.custom_gradient
-        def func(x):
-            y = _blur2d(x, f, normalize)
+        def func(in_x):
+            y = _blur2d(in_x, f, normalize)
             @tf.custom_gradient
             def grad(dy):
                 dx = _blur2d(dy, f, normalize, flip=True)
@@ -108,8 +101,8 @@ def blur2d(x, f=[1,2,1], normalize=True):
 def upscale2d(x, factor=2):
     with tf.variable_scope('Upscale2D'):
         @tf.custom_gradient
-        def func(x):
-            y = _upscale2d(x, factor)
+        def func(in_x):
+            y = _upscale2d(in_x, factor)
             @tf.custom_gradient
             def grad(dy):
                 dx = _downscale2d(dy, factor, gain=factor**2)
@@ -120,8 +113,8 @@ def upscale2d(x, factor=2):
 def downscale2d(x, factor=2):
     with tf.variable_scope('Downscale2D'):
         @tf.custom_gradient
-        def func(x):
-            y = _downscale2d(x, factor)
+        def func(in_x):
+            y = _downscale2d(in_x, factor)
             @tf.custom_gradient
             def grad(dy):
                 dx = _upscale2d(dy, factor, gain=1/factor**2)
@@ -224,8 +217,8 @@ def leaky_relu(x, alpha=0.2):
     with tf.variable_scope('LeakyReLU'):
         alpha = tf.constant(alpha, dtype=x.dtype, name='alpha')
         @tf.custom_gradient
-        def func(x):
-            y = tf.maximum(x, x * alpha)
+        def func(in_x):
+            y = tf.maximum(in_x, in_x * alpha)
             @tf.custom_gradient
             def grad(dy):
                 dx = tf.where(y >= 0, dy, dy * alpha)
@@ -262,7 +255,7 @@ def style_mod(x, dlatent, **kwargs):
     with tf.variable_scope('StyleMod'):
         style = apply_bias(dense(dlatent, fmaps=x.shape[1]*2, gain=1, **kwargs))
         style = tf.reshape(style, [-1, 2, x.shape[1]] + [1] * (len(x.shape) - 2))
-        return x * (style[:,0] + 1) + style[:,1]
+        return x * (style[:,0] + 1) + style[:,1] # TOOD: check if there is a mistake here.
 
 #----------------------------------------------------------------------------
 # Noise input.
@@ -299,6 +292,8 @@ def minibatch_stddev_layer(x, group_size=4, num_new_features=1):
 # Style-based generator used in the StyleGAN paper.
 # Composed of two sub-networks (G_mapping and G_synthesis) that are defined below.
 
+# Animesh note: Mixing regularization is not possible for the MSG-GAN.
+# But, TODO: check if the figure 3 (from paper) can still be created and made sense with.
 def G_style(
     latents_in,                                     # First input: Latent vectors (Z) [minibatch, latent_size].
     labels_in,                                      # Second input: Conditioning labels [minibatch, label_size].
@@ -307,10 +302,8 @@ def G_style(
     truncation_psi_val      = None,                 # Value for truncation_psi to use during validation.
     truncation_cutoff_val   = None,                 # Value for truncation_cutoff to use during validation.
     dlatent_avg_beta        = 0.995,                # Decay for tracking the moving average of W during training. None = disable.
-    style_mixing_prob       = 0.9,                  # Probability of mixing styles during training. None = disable.
     is_training             = False,                # Network is under training? Enables and disables specific features.
     is_validation           = False,                # Network is under validation? Chooses which value to use for truncation_psi.
-    is_template_graph       = False,                # True = template graph constructed by the Network class, False = actual evaluation.
     components              = dnnlib.EasyDict(),    # Container for sub-networks. Retained between calls.
     **kwargs):                                      # Arguments for sub-networks (G_mapping and G_synthesis).
 
@@ -326,19 +319,16 @@ def G_style(
         truncation_cutoff = None
     if not is_training or (dlatent_avg_beta is not None and not tflib.is_tf_expression(dlatent_avg_beta) and dlatent_avg_beta == 1):
         dlatent_avg_beta = None
-    if not is_training or (style_mixing_prob is not None and not tflib.is_tf_expression(style_mixing_prob) and style_mixing_prob <= 0):
-        style_mixing_prob = None
 
     # Setup components.
     if 'synthesis' not in components:
-        components.synthesis = tflib.Network('G_synthesis', func_name=G_synthesis, **kwargs)
+        components.synthesis = tflib.Network(num_inputs=1, name='G_synthesis', func_name=G_synthesis, **kwargs)
     num_layers = components.synthesis.input_shape[1]
     dlatent_size = components.synthesis.input_shape[2]
     if 'mapping' not in components:
-        components.mapping = tflib.Network('G_mapping', func_name=G_mapping, dlatent_broadcast=num_layers, **kwargs)
+        components.mapping = tflib.Network(num_inputs=2, name='G_mapping', func_name=G_mapping, dlatent_broadcast=num_layers, **kwargs)
 
     # Setup variables.
-    lod_in = tf.get_variable('lod', initializer=np.float32(0), trainable=False)
     dlatent_avg = tf.get_variable('dlatent_avg', shape=[dlatent_size], initializer=tf.initializers.zeros(), trainable=False)
 
     # Evaluate mapping network.
@@ -352,19 +342,6 @@ def G_style(
             with tf.control_dependencies([update_op]):
                 dlatents = tf.identity(dlatents)
 
-    # Perform style mixing regularization.
-    if style_mixing_prob is not None:
-        with tf.name_scope('StyleMix'):
-            latents2 = tf.random_normal(tf.shape(latents_in))
-            dlatents2 = components.mapping.get_output_for(latents2, labels_in, **kwargs)
-            layer_idx = np.arange(num_layers)[np.newaxis, :, np.newaxis]
-            cur_layers = num_layers - tf.cast(lod_in, tf.int32) * 2
-            mixing_cutoff = tf.cond(
-                tf.random_uniform([], 0.0, 1.0) < style_mixing_prob,
-                lambda: tf.random_uniform([], 1, cur_layers, dtype=tf.int32),
-                lambda: cur_layers)
-            dlatents = tf.where(tf.broadcast_to(layer_idx < mixing_cutoff, tf.shape(dlatents)), dlatents, dlatents2)
-
     # Apply truncation trick.
     if truncation_psi is not None and truncation_cutoff is not None:
         with tf.variable_scope('Truncation'):
@@ -374,9 +351,8 @@ def G_style(
             dlatents = tflib.lerp(dlatent_avg, dlatents, coefs)
 
     # Evaluate synthesis network.
-    with tf.control_dependencies([tf.assign(components.synthesis.find_var('lod'), lod_in)]):
-        images_out = components.synthesis.get_output_for(dlatents, force_clean_graph=is_template_graph, **kwargs)
-    return tf.identity(images_out, name='images_out')
+    images_out = components.synthesis.get_output_for(dlatents, **kwargs)
+    return images_out
 
 #----------------------------------------------------------------------------
 # Mapping network used in the StyleGAN paper.
@@ -456,27 +432,20 @@ def G_synthesis(
     dtype               = 'float32',    # Data type to use for activations and outputs.
     fused_scale         = 'auto',       # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
     blur_filter         = [1,2,1],      # Low-pass filter to apply when resampling activations. None = no filtering.
-    structure           = 'auto',       # 'fixed' = no progressive growing, 'linear' = human-readable, 'recursive' = efficient, 'auto' = select automatically.
-    is_template_graph   = False,        # True = template graph constructed by the Network class, False = actual evaluation.
-    force_clean_graph   = False,        # True = construct a clean graph that looks nice in TensorBoard, False = default behavior.
     **_kwargs):                         # Ignore unrecognized keyword args.
 
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
-    def blur(x): return blur2d(x, blur_filter) if blur_filter else x
-    if is_template_graph: force_clean_graph = True
-    if force_clean_graph: randomize_noise = False
-    if structure == 'auto': structure = 'linear' if force_clean_graph else 'recursive'
+    def blur(in_x): return blur2d(in_x, blur_filter) if blur_filter else in_x
     act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[nonlinearity]
     num_layers = resolution_log2 * 2 - 2
     num_styles = num_layers if use_styles else 1
-    images_out = None
+    images_out = []  # list will contain the output images at different resolutions
 
     # Primary inputs.
     dlatents_in.set_shape([None, num_styles, dlatent_size])
     dlatents_in = tf.cast(dlatents_in, dtype)
-    lod_in = tf.cast(tf.get_variable('lod', initializer=np.float32(0), trainable=False), dtype)
 
     # Noise inputs.
     noise_inputs = []
@@ -487,18 +456,18 @@ def G_synthesis(
             noise_inputs.append(tf.get_variable('noise%d' % layer_idx, shape=shape, initializer=tf.initializers.random_normal(), trainable=False))
 
     # Things to do at the end of each layer.
-    def layer_epilogue(x, layer_idx):
+    def layer_epilogue(in_x, in_layer_idx):
         if use_noise:
-            x = apply_noise(x, noise_inputs[layer_idx], randomize_noise=randomize_noise)
-        x = apply_bias(x)
-        x = act(x)
+            in_x = apply_noise(in_x, noise_inputs[in_layer_idx], randomize_noise=randomize_noise)
+        in_x = apply_bias(in_x)
+        in_x = act(in_x)
         if use_pixel_norm:
-            x = pixel_norm(x)
+            in_x = pixel_norm(in_x)
         if use_instance_norm:
-            x = instance_norm(x)
+            in_x = instance_norm(in_x)
         if use_styles:
-            x = style_mod(x, dlatents_in[:, layer_idx], use_wscale=use_wscale)
-        return x
+            in_x = style_mod(in_x, dlatents_in[:, in_layer_idx], use_wscale=use_wscale)
+        return in_x
 
     # Early layers.
     with tf.variable_scope('4x4'):
@@ -514,56 +483,34 @@ def G_synthesis(
             x = layer_epilogue(conv2d(x, fmaps=nf(1), kernel=3, gain=gain, use_wscale=use_wscale), 1)
 
     # Building blocks for remaining layers.
-    def block(res, x): # res = 3..resolution_log2
-        with tf.variable_scope('%dx%d' % (2**res, 2**res)):
+    def block(in_res, in_x): # res = 3..resolution_log2
+        with tf.variable_scope('%dx%d' % (2 ** in_res, 2 ** in_res)):
             with tf.variable_scope('Conv0_up'):
-                x = layer_epilogue(blur(upscale2d_conv2d(x, fmaps=nf(res-1), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)), res*2-4)
+                in_x = layer_epilogue(blur(upscale2d_conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)), in_res * 2 - 4)
             with tf.variable_scope('Conv1'):
-                x = layer_epilogue(conv2d(x, fmaps=nf(res-1), kernel=3, gain=gain, use_wscale=use_wscale), res*2-3)
-            return x
-    def torgb(res, x): # res = 2..resolution_log2
-        lod = resolution_log2 - res
-        with tf.variable_scope('ToRGB_lod%d' % lod):
-            return apply_bias(conv2d(x, fmaps=num_channels, kernel=1, gain=1, use_wscale=use_wscale))
+                in_x = layer_epilogue(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale), in_res * 2 - 3)
+            return in_x
+    def torgb(in_res, in_x): # res = 2..resolution_log2
+        in_lod = resolution_log2 - in_res
+        with tf.variable_scope('ToRGB_lod%d' % in_lod):
+            return apply_bias(conv2d(in_x, fmaps=num_channels, kernel=1, gain=1, use_wscale=use_wscale))
 
-    # Fixed structure: simple and efficient, but does not support progressive growing.
-    if structure == 'fixed':
-        for res in range(3, resolution_log2 + 1):
-            x = block(res, x)
-        images_out = torgb(resolution_log2, x)
+    # Finally, arrange the computations for the layers
+    images_out.append(torgb(2, x))
+    for res in range(3, resolution_log2 + 1):
+        x = block(res, x)
+        images_out.append(torgb(res, x))
 
-    # Linear structure: simple but inefficient.
-    if structure == 'linear':
-        images_out = torgb(2, x)
-        for res in range(3, resolution_log2 + 1):
-            lod = resolution_log2 - res
-            x = block(res, x)
-            img = torgb(res, x)
-            images_out = upscale2d(images_out)
-            with tf.variable_scope('Grow_lod%d' % lod):
-                images_out = tflib.lerp_clip(img, images_out, lod_in - lod)
-
-    # Recursive structure: complex but efficient.
-    if structure == 'recursive':
-        def cset(cur_lambda, new_cond, new_lambda):
-            return lambda: tf.cond(new_cond, new_lambda, cur_lambda)
-        def grow(x, res, lod):
-            y = block(res, x)
-            img = lambda: upscale2d(torgb(res, y), 2**lod)
-            img = cset(img, (lod_in > lod), lambda: upscale2d(tflib.lerp(torgb(res, y), upscale2d(torgb(res - 1, x)), lod_in - lod), 2**lod))
-            if lod > 0: img = cset(img, (lod_in < lod), lambda: grow(y, res + 1, lod - 1))
-            return img()
-        images_out = grow(x, 3, resolution_log2 - 3)
-
-    assert images_out.dtype == tf.as_dtype(dtype)
-    return tf.identity(images_out, name='images_out')
+    assert all(image_out.dtype == tf.as_dtype(dtype) for image_out in images_out), \
+        "DataType is messed up during G_synthesis computations"
+    return tuple([tf.identity(image_out, name='images_out_'+str(2**res)+'x'+str(2**res))
+                  for res, image_out in enumerate(images_out, 2)])
 
 #----------------------------------------------------------------------------
 # Discriminator used in the StyleGAN paper.
 
 def D_basic(
-    images_in,                          # First input: Images [minibatch, channel, height, width].
-    labels_in,                          # Second input: Labels [minibatch, label_size].
+    *inputs_in,                         # Input: List of images at different resolutions + labels
     num_channels        = 1,            # Number of input color channels. Overridden based on dataset.
     resolution          = 32,           # Input resolution. Overridden based on dataset.
     label_size          = 0,            # Dimensionality of the labels, 0 if no labels. Overridden based on dataset.
@@ -577,77 +524,59 @@ def D_basic(
     dtype               = 'float32',    # Data type to use for activations and outputs.
     fused_scale         = 'auto',       # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
     blur_filter         = [1,2,1],      # Low-pass filter to apply when resampling activations. None = no filtering.
-    structure           = 'auto',       # 'fixed' = no progressive growing, 'linear' = human-readable, 'recursive' = efficient, 'auto' = select automatically.
-    is_template_graph   = False,        # True = template graph constructed by the Network class, False = actual evaluation.
     **_kwargs):                         # Ignore unrecognized keyword args.
 
     resolution_log2 = int(np.log2(resolution))
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
-    def blur(x): return blur2d(x, blur_filter) if blur_filter else x
-    if structure == 'auto': structure = 'linear' if is_template_graph else 'recursive'
+    def blur(in_x): return blur2d(in_x, blur_filter) if blur_filter else in_x
+    def conv1x1(x_in, fmaps): return conv2d(x_in, fmaps, kernel=1, use_wscale=use_wscale)
     act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[nonlinearity]
 
-    images_in.set_shape([None, num_channels, resolution, resolution])
+    labels_in = inputs_in[-1]
+    images_in = inputs_in[:-1]
+    for res, image_in in zip(range(2, resolution_log2 + 1), images_in):
+        image_in.set_shape([None, num_channels, (2 ** res), (2 ** res)])
     labels_in.set_shape([None, label_size])
-    images_in = tf.cast(images_in, dtype)
+    images_in = [tf.cast(image_in, dtype) for image_in in images_in]
     labels_in = tf.cast(labels_in, dtype)
-    lod_in = tf.cast(tf.get_variable('lod', initializer=np.float32(0.0), trainable=False), dtype)
-    scores_out = None
 
     # Building blocks.
-    def fromrgb(x, res): # res = 2..resolution_log2
-        with tf.variable_scope('FromRGB_lod%d' % (resolution_log2 - res)):
-            return act(apply_bias(conv2d(x, fmaps=nf(res-1), kernel=1, gain=gain, use_wscale=use_wscale)))
-    def block(x, res): # res = 2..resolution_log2
-        with tf.variable_scope('%dx%d' % (2**res, 2**res)):
-            if res >= 3: # 8x8 and up
+    def fromrgb(in_x, in_res, full_maps=False): # res = 2..resolution_log2
+        with tf.variable_scope('FromRGB_lod%d' % (resolution_log2 - in_res)):
+            if full_maps:
+                return act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=1, use_wscale=use_wscale)))
+            return act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1) // 2, kernel=1, use_wscale=use_wscale)))
+
+    def block(in_x, in_res, g_img=None): # res = 2..resolution_log2
+        with tf.variable_scope('%dx%d' % (2 ** in_res, 2 ** in_res)):
+            if g_img is not None:  # the combine function is a learnable 1x1 conv layer
+                with tf.variable_scope("combine"):
+                    in_x = conv1x1(tf.concat((in_x, g_img), axis=1), nf(in_res - 1))
+            if mbstd_group_size > 1:
+                in_x = minibatch_stddev_layer(in_x, mbstd_group_size, mbstd_num_features)
+            if in_res >= 3: # 8x8 and up
                 with tf.variable_scope('Conv0'):
-                    x = act(apply_bias(conv2d(x, fmaps=nf(res-1), kernel=3, gain=gain, use_wscale=use_wscale)))
+                    in_x = act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale)))
                 with tf.variable_scope('Conv1_down'):
-                    x = act(apply_bias(conv2d_downscale2d(blur(x), fmaps=nf(res-2), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)))
+                    in_x = act(apply_bias(conv2d_downscale2d(blur(in_x), fmaps=nf(in_res - 2), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)))
             else: # 4x4
-                if mbstd_group_size > 1:
-                    x = minibatch_stddev_layer(x, mbstd_group_size, mbstd_num_features)
                 with tf.variable_scope('Conv'):
-                    x = act(apply_bias(conv2d(x, fmaps=nf(res-1), kernel=3, gain=gain, use_wscale=use_wscale)))
+                    in_x = act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale)))
                 with tf.variable_scope('Dense0'):
-                    x = act(apply_bias(dense(x, fmaps=nf(res-2), gain=gain, use_wscale=use_wscale)))
+                    in_x = act(apply_bias(dense(in_x, fmaps=nf(in_res - 2), gain=gain, use_wscale=use_wscale)))
                 with tf.variable_scope('Dense1'):
-                    x = apply_bias(dense(x, fmaps=max(label_size, 1), gain=1, use_wscale=use_wscale))
-            return x
+                    in_x = apply_bias(dense(in_x, fmaps=max(label_size, 1), gain=1, use_wscale=use_wscale))
+            return in_x
 
     # Fixed structure: simple and efficient, but does not support progressive growing.
-    if structure == 'fixed':
-        x = fromrgb(images_in, resolution_log2)
-        for res in range(resolution_log2, 2, -1):
-            x = block(x, res)
-        scores_out = block(x, 2)
-
-    # Linear structure: simple but inefficient.
-    if structure == 'linear':
-        img = images_in
-        x = fromrgb(img, resolution_log2)
-        for res in range(resolution_log2, 2, -1):
-            lod = resolution_log2 - res
-            x = block(x, res)
-            img = downscale2d(img)
-            y = fromrgb(img, res - 1)
-            with tf.variable_scope('Grow_lod%d' % lod):
-                x = tflib.lerp_clip(x, y, lod_in - lod)
-        scores_out = block(x, 2)
-
-    # Recursive structure: complex but efficient.
-    if structure == 'recursive':
-        def cset(cur_lambda, new_cond, new_lambda):
-            return lambda: tf.cond(new_cond, new_lambda, cur_lambda)
-        def grow(res, lod):
-            x = lambda: fromrgb(downscale2d(images_in, 2**lod), res)
-            if lod > 0: x = cset(x, (lod_in < lod), lambda: grow(res + 1, lod - 1))
-            x = block(x(), res); y = lambda: x
-            if res > 2: y = cset(y, (lod_in > lod), lambda: tflib.lerp(x, fromrgb(downscale2d(images_in, 2**(lod+1)), res - 1), lod_in - lod))
-            return y()
-        scores_out = grow(2, resolution_log2 - 2)
+    x = fromrgb(images_in[-1], resolution_log2, full_maps=True)
+    x = block(x, resolution_log2)
+    for (img, res) in \
+            zip(reversed(images_in[:-1]),
+                range(resolution_log2 - 1, 2, -1)):
+        x = block(x, res, img)
+    scores_out = block(x, 2, images_in[0])
 
     # Label conditioning from "Which Training Methods for GANs do actually Converge?"
     if label_size:

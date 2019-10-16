@@ -86,6 +86,34 @@ def save_image(image, filename, drange=[0,1], quality=95):
 def save_image_grid(images, filename, drange=[0,1], grid_size=None):
     convert_to_pil_image(create_image_grid(images, grid_size), drange).save(filename)
 
+def save_image_grids(multi_scale_images, filenames, drange=[0,1], grid_size=None):
+    def dumb_upsample_nn(in_arr, factor):
+        assert len(in_arr.shape) == 4
+        assert isinstance(factor, int) and factor >= 1
+
+        # No-op => early exit.
+        if factor == 1:
+            return in_arr
+
+        # Upscale using np.tile().
+        s = in_arr.shape
+        in_arr = np.reshape(in_arr, [-1, s[1], s[2], 1, s[3], 1])
+        in_arr = np.tile(in_arr, [1, 1, 1, factor, 1, factor])
+        in_arr = np.reshape(in_arr, [-1, s[1], s[2] * factor, s[3] * factor])
+        return in_arr
+
+    # make sure that the directories of the filenames exist:
+    for filename in filenames:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+    # bring all the images to the size of the highest resolution image
+    highest_res_log_2 = int(np.log2(multi_scale_images[-1].shape[-1]))
+
+    multi_scale_images = [dumb_upsample_nn(images, int(2 ** (highest_res_log_2 - int(np.log2(images.shape[-1])))))
+                          for images in multi_scale_images]
+
+    for images, filename in zip(multi_scale_images, filenames):
+        convert_to_pil_image(create_image_grid(images, grid_size), drange).save(filename)
+
 #----------------------------------------------------------------------------
 # Locating results.
 
@@ -201,11 +229,11 @@ def setup_snapshot_image_grid(G, training_set,
     # Select size.
     gw = 1; gh = 1
     if size == '1080p':
-        gw = np.clip(1920 // G.output_shape[3], 3, 32)
-        gh = np.clip(1080 // G.output_shape[2], 2, 32)
+        gw = np.clip(1920 // G.output_shapes[-1][3], 3, 32)
+        gh = np.clip(1080 // G.output_shapes[-1][2], 2, 32)
     if size == '4k':
-        gw = np.clip(3840 // G.output_shape[3], 7, 32)
-        gh = np.clip(2160 // G.output_shape[2], 4, 32)
+        gw = np.clip(3840 // G.output_shapes[-1][3], 7, 32)
+        gh = np.clip(2160 // G.output_shapes[-1][2], 4, 32)
 
     # Initialize data arrays.
     reals = np.zeros([gw * gh] + training_set.shape, dtype=training_set.dtype)

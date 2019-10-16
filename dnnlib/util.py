@@ -50,7 +50,8 @@ class EasyDict(dict):
 
 
 class Logger(object):
-    """Redirect stderr to stdout, optionally print stdout to a file, and optionally force flushing on both stdout and the file."""
+    """ Redirect stderr to stdout, optionally print stdout to a file,
+    and optionally force flushing on both stdout and the file. """
 
     def __init__(self, file_name: str = None, file_mode: str = "w", should_flush: bool = True):
         self.file = None

@@ -71,7 +71,7 @@ class Network:
         var_global_to_local: Mapping from variable global names to local names.
     """
 
-    def __init__(self, name: str = None, func_name: Any = None, **static_kwargs):
+    def __init__(self, num_inputs: int, name: str = None, func_name: Any = None, **static_kwargs):
         tfutil.assert_tf_initialized()
         assert isinstance(name, str) or name is None
         assert func_name is not None
@@ -79,6 +79,7 @@ class Network:
         assert util.is_pickleable(static_kwargs)
 
         self._init_fields()
+        self.num_inputs = num_inputs
         self.name = name
         self.static_kwargs = util.EasyDict(static_kwargs)
 
@@ -126,12 +127,6 @@ class Network:
     def _init_graph(self) -> None:
         # Collect inputs.
         self.input_names = []
-
-        for param in inspect.signature(self._build_func).parameters.values():
-            if param.kind == param.POSITIONAL_OR_KEYWORD and param.default is param.empty:
-                self.input_names.append(param.name)
-
-        self.num_inputs = len(self.input_names)
         assert self.num_inputs >= 1
 
         # Choose name and scope.
@@ -143,7 +138,6 @@ class Network:
 
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
-        build_kwargs["is_template_graph"] = True
         build_kwargs["components"] = self.components
 
         # Build template graph.
@@ -151,8 +145,12 @@ class Network:
             assert tf.get_variable_scope().name == self.scope
             assert tf.get_default_graph().get_name_scope() == self.scope
             with tf.control_dependencies(None):  # ignore surrounding control dependencies
-                self.input_templates = [tf.placeholder(tf.float32, name=name) for name in self.input_names]
+                self.input_templates = [tf.placeholder(tf.float32, name="input_" + str(inp_num))
+                                        for inp_num in range(self.num_inputs)]
                 out_expr = self._build_func(*self.input_templates, **build_kwargs)
+
+        # populate the input names
+        self.input_names = [inp.name.split("/")[-1][:-2] for inp in self.input_templates]
 
         # Collect outputs.
         assert tfutil.is_tf_expression(out_expr) or isinstance(out_expr, tuple)
@@ -205,7 +203,6 @@ class Network:
         # Finalize build func kwargs.
         build_kwargs = dict(self.static_kwargs)
         build_kwargs.update(dynamic_kwargs)
-        build_kwargs["is_template_graph"] = False
         build_kwargs["components"] = self.components
 
         # Build TensorFlow graph to evaluate the network.
@@ -256,6 +253,7 @@ class Network:
     def __getstate__(self) -> dict:
         """Pickle export."""
         state = dict()
+        state["num_inputs"]         = self.num_inputs
         state["version"]            = 3
         state["name"]               = self.name
         state["static_kwargs"]      = dict(self.static_kwargs)
@@ -278,6 +276,7 @@ class Network:
         # Set basic fields.
         assert state["version"] in [2, 3]
         self.name = state["name"]
+        self.num_inputs = state["num_inputs"]
         self.static_kwargs = util.EasyDict(state["static_kwargs"])
         self.components = util.EasyDict(state.get("components", {}))
         self._build_module_src = state["build_module_src"]
@@ -304,6 +303,7 @@ class Network:
         # pylint: disable=protected-access
         net = object.__new__(Network)
         net._init_fields()
+        net.num_inputs = self.num_inputs
         net.name = name if name is not None else self.name
         net.static_kwargs = util.EasyDict(self.static_kwargs)
         net.static_kwargs.update(new_static_kwargs)
@@ -390,7 +390,7 @@ class Network:
         key = dict(input_transform=input_transform, output_transform=output_transform, num_gpus=num_gpus, assume_frozen=assume_frozen, dynamic_kwargs=dynamic_kwargs)
         def unwind_key(obj):
             if isinstance(obj, dict):
-                return [(key, unwind_key(value)) for key, value in sorted(obj.items())]
+                return [(in_key, unwind_key(value)) for in_key, value in sorted(obj.items())]
             if callable(obj):
                 return util.get_top_level_function_name(obj)
             return obj
@@ -439,7 +439,7 @@ class Network:
 
             mb_end = min(mb_begin + minibatch_size, num_items)
             mb_num = mb_end - mb_begin
-            mb_in = [src[mb_begin : mb_end] if src is not None else np.zeros([mb_num] + shape[1:]) for src, shape in zip(in_arrays, self.input_shapes)]
+            mb_in = [src[mb_begin: mb_end] if src is not None else np.zeros([mb_num] + shape[1:]) for src, shape in zip(in_arrays, self.input_shapes)]
             mb_out = tf.get_default_session().run(out_expr, dict(zip(in_expr, mb_in)))
 
             for dst, src in zip(out_arrays, mb_out):

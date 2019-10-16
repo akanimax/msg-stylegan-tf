@@ -10,9 +10,9 @@
 #----------------------------------------------------------------------------
 # Paths.
 
-result_dir = 'results'
-data_dir = 'datasets'
-cache_dir = 'cache'
+result_dir = '/home/karnewar/home2/self/msg-stylegan/'
+data_dir = '/media/deepstorage01/datasets_external/'
+cache_dir = '/home/karnewar/home2/self/msg-stylegan/cache'
 run_dir_ignore = ['results', 'datasets', 'cache']
 
 #----------------------------------------------------------------------------
