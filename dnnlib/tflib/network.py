@@ -276,7 +276,6 @@ class Network:
         # Set basic fields.
         assert state["version"] in [2, 3]
         self.name = state["name"]
-        self.num_inputs = state["num_inputs"]
         self.static_kwargs = util.EasyDict(state["static_kwargs"])
         self.components = util.EasyDict(state.get("components", {}))
         self._build_module_src = state["build_module_src"]
@@ -292,6 +291,17 @@ class Network:
         # Locate network build function in the temporary module.
         self._build_func = util.get_obj_from_module(module, self._build_func_name)
         assert callable(self._build_func)
+
+        # take care of the num_inputs
+        if "num_inputs" in state:
+            self.num_inputs = state["num_inputs"]
+        else:
+            input_names = []
+            for param in inspect.signature(self._build_func).parameters.values():
+                if param.kind == param.POSITIONAL_OR_KEYWORD and param.default is param.empty:
+                    input_names.append(param.name)
+
+            self.num_inputs = len(input_names)
 
         # Init TensorFlow graph.
         self._init_graph()
