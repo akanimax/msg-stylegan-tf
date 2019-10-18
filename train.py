@@ -29,7 +29,7 @@ D_loss        = EasyDict(func_name='training.loss.D_logistic_simplegp', r1_gamma
 dataset       = EasyDict()                                                             # Options for load_dataset().
 sched         = EasyDict()                                                             # Options for TrainingSchedule.
 grid          = EasyDict(size='4k', layout='random')                                   # Options for setup_snapshot_image_grid().
-metric_base.fid50k.update({"inception_net_path": os.path.join(config.result_dir, "inception_network", "inception_v3_features.pkl"), "num_images": 100})
+metric_base.fid50k.update({"inception_net_path": os.path.join(config.result_dir, "inception_network", "inception_v3_features.pkl")})
 metrics       = [metric_base.fid50k]   # Options for MetricGroup.
 submit_config = dnnlib.SubmitConfig()                                                  # Options for dnnlib.submit_run().
 tf_config     = {'rnd.np_random_seed': 1000}                                              # Options for tflib.init_tf().
