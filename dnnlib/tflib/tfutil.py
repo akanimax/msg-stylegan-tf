@@ -215,26 +215,27 @@ def create_var_with_large_initial_value(initial_value: np.ndarray, *args, **kwar
     return var
 
 
-def convert_images_from_uint8(images, drange=[-1,1], nhwc_to_nchw=False):
+def convert_images_from_uint8(*images, drange=[-1,1], nhwc_to_nchw=False):
     """Convert a minibatch of images from uint8 to float32 with configurable dynamic range.
     Can be used as an input transformation for Network.run().
     """
-    images = tf.cast(images, tf.float32)
+    images = [tf.cast(image, tf.float32) for image in images]
     if nhwc_to_nchw:
-        images = tf.transpose(images, [0, 3, 1, 2])
-    return (images - drange[0]) * ((drange[1] - drange[0]) / 255)
+        images = [tf.transpose(image, [0, 3, 1, 2]) for image in images]
+    return [(image - drange[0]) * ((drange[1] - drange[0]) / 255) for image in images]
 
 
-def convert_images_to_uint8(images, drange=[-1,1], nchw_to_nhwc=False, shrink=1):
+def convert_images_to_uint8(*images, drange=[-1,1], nchw_to_nhwc=False, shrink=1):
     """Convert a minibatch of images from float32 to uint8 with configurable dynamic range.
     Can be used as an output transformation for Network.run().
     """
-    images = tf.cast(images, tf.float32)
+    images = [tf.cast(image, tf.float32) for image in images]
     if shrink > 1:
         ksize = [1, 1, shrink, shrink]
-        images = tf.nn.avg_pool(images, ksize=ksize, strides=ksize, padding="VALID", data_format="NCHW")
+        images = [tf.nn.avg_pool(image, ksize=ksize, strides=ksize, padding="VALID", data_format="NCHW")
+                  for image in images]
     if nchw_to_nhwc:
-        images = tf.transpose(images, [0, 2, 3, 1])
+        images = [tf.transpose(image, [0, 2, 3, 1]) for image in images]
     scale = 255 / (drange[1] - drange[0])
-    images = images * scale + (0.5 - drange[0] * scale)
-    return tf.saturate_cast(images, tf.uint8)
+    images = [image * scale + (0.5 - drange[0] * scale) for image in images]
+    return [tf.saturate_cast(image, tf.uint8) for image in images]

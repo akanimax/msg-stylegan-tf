@@ -35,8 +35,8 @@ submit_config = dnnlib.SubmitConfig()                                           
 tf_config     = {'rnd.np_random_seed': 1000}                                              # Options for tflib.init_tf().
 
 # Dataset.
-desc += '-ffhq';      dataset = EasyDict(tfrecord_dir='ffhq/tfrecords');       train.mirror_augment = True
-#desc += '-oxford_flowers256';  dataset = EasyDict(tfrecord_dir='oxford_flowers/tfrecords', resolution=256); train.mirror_augment = True
+#desc += '-ffhq';      dataset = EasyDict(tfrecord_dir='ffhq/tfrecords');       train.mirror_augment = True
+desc += '-oxford_flowers256';  dataset = EasyDict(tfrecord_dir='oxford_flowers/tfrecords', resolution=256); train.mirror_augment = True
 #desc += '-ffhq512';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=512); train.mirror_augment = True
 #desc += '-ffhq256';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=256); train.mirror_augment = True
 #desc += '-celebahq'; dataset = EasyDict(tfrecord_dir='celebahq');             train.mirror_augment = True
@@ -46,8 +46,8 @@ desc += '-ffhq';      dataset = EasyDict(tfrecord_dir='ffhq/tfrecords');       t
 
 # Number of GPUs.
 #desc += '-1gpu'; submit_config.num_gpus = 1; sched.minibatch_size = 4
-#desc += '-2gpu'; submit_config.num_gpus = 2; sched.minibatch_size = 8
-desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_size = 16
+desc += '-2gpu'; submit_config.num_gpus = 2; sched.minibatch_size = 32
+#desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_size = 16
 #desc += '-8gpu'; submit_config.num_gpus = 8; sched.minibatch_size = 32
 
 # Default options.

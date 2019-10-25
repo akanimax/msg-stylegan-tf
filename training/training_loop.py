@@ -161,7 +161,7 @@ def training_loop(
             G_gpu = G if gpu == 0 else G.clone(G.name + '_shadow')
             D_gpu = D if gpu == 0 else D.clone(D.name + '_shadow')
             reals, labels = training_set.get_minibatch_tf()
-            reals = process_reals(reals, mirror_augment, training_set.dynamic_range, drange_net)
+            reals = process_reals(reals, mirror_augment, training_set.dynamic_range, drange_net, depth=training_set.resolution_log2 - 1)
             with tf.name_scope('G_loss'):
                 G_loss = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set,
                                                        minibatch_size=minibatch_split, **G_loss_args)
