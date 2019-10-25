@@ -222,7 +222,8 @@ def convert_images_from_uint8(*images, drange=[-1,1], nhwc_to_nchw=False):
     images = [tf.cast(image, tf.float32) for image in images]
     if nhwc_to_nchw:
         images = [tf.transpose(image, [0, 3, 1, 2]) for image in images]
-    return [(image - drange[0]) * ((drange[1] - drange[0]) / 255) for image in images]
+    images = [(image - drange[0]) * ((drange[1] - drange[0]) / 255) for image in images]
+    return images[0] if len(images) == 1 else images
 
 
 def convert_images_to_uint8(*images, drange=[-1,1], nchw_to_nhwc=False, shrink=1):
@@ -238,4 +239,5 @@ def convert_images_to_uint8(*images, drange=[-1,1], nchw_to_nhwc=False, shrink=1
         images = [tf.transpose(image, [0, 2, 3, 1]) for image in images]
     scale = 255 / (drange[1] - drange[0])
     images = [image * scale + (0.5 - drange[0] * scale) for image in images]
-    return [tf.saturate_cast(image, tf.uint8) for image in images]
+    images = [tf.saturate_cast(image, tf.uint8) for image in images]
+    return images[0] if len(images) == 1 else images

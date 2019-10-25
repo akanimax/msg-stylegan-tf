@@ -28,15 +28,15 @@ G_loss        = EasyDict(func_name='training.loss.G_logistic_nonsaturating')    
 D_loss        = EasyDict(func_name='training.loss.D_logistic_simplegp', r1_gamma=10.0) # Options for discriminator loss.
 dataset       = EasyDict()                                                             # Options for load_dataset().
 sched         = EasyDict()                                                             # Options for TrainingSchedule.
-grid          = EasyDict(size='4k', layout='random')                                   # Options for setup_snapshot_image_grid().
+grid          = EasyDict(size='1080p', layout='random')                                # Options for setup_snapshot_image_grid().
 metric_base.fid50k.update({"inception_net_path": os.path.join(config.result_dir, "inception_network", "inception_v3_features.pkl")})
 metrics       = [metric_base.fid50k]   # Options for MetricGroup.
 submit_config = dnnlib.SubmitConfig()                                                  # Options for dnnlib.submit_run().
-tf_config     = {'rnd.np_random_seed': 1000}                                              # Options for tflib.init_tf().
+tf_config     = {'rnd.np_random_seed': 333}                                            # Options for tflib.init_tf().
 
 # Dataset.
 #desc += '-ffhq';      dataset = EasyDict(tfrecord_dir='ffhq/tfrecords');       train.mirror_augment = True
-desc += '-oxford_flowers256';  dataset = EasyDict(tfrecord_dir='oxford_flowers/tfrecords', resolution=256); train.mirror_augment = True
+desc += '-indian_celebs';  dataset = EasyDict(tfrecord_dir='indian_celebs/tfrecords', resolution=256); train.mirror_augment = True
 #desc += '-ffhq512';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=512); train.mirror_augment = True
 #desc += '-ffhq256';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=256); train.mirror_augment = True
 #desc += '-celebahq'; dataset = EasyDict(tfrecord_dir='celebahq');             train.mirror_augment = True
@@ -46,8 +46,8 @@ desc += '-oxford_flowers256';  dataset = EasyDict(tfrecord_dir='oxford_flowers/t
 
 # Number of GPUs.
 #desc += '-1gpu'; submit_config.num_gpus = 1; sched.minibatch_size = 4
-desc += '-2gpu'; submit_config.num_gpus = 2; sched.minibatch_size = 32
-#desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_size = 16
+#desc += '-2gpu'; submit_config.num_gpus = 2; sched.minibatch_size = 32
+desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_size = 16
 #desc += '-8gpu'; submit_config.num_gpus = 8; sched.minibatch_size = 32
 
 # Default options.
@@ -56,7 +56,7 @@ sched.G_lrate = 0.003
 sched.D_lrate = sched.G_lrate
 
 # related to frequency of logs:
-sched.tick_kimg = 160
+sched.tick_kimg = 100
 image_snapshot_ticks = 1
 network_snapshot_ticks = 10
 

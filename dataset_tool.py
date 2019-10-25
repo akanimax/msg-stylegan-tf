@@ -502,9 +502,21 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 
 #----------------------------------------------------------------------------
 
+def _get_all_files(path):
+    if os.path.isfile(path):
+        return [path]
+
+    possible_files = sorted(glob.glob(os.path.join(path, '*')))
+    return_list = []
+    for possible_file in possible_files:
+        return_list.extend(_get_all_files(possible_file))
+    return return_list
+
+
 def create_from_images(tfrecord_dir, image_dir, shuffle):
     print('Loading images from "%s"' % image_dir)
-    image_filenames = sorted(glob.glob(os.path.join(image_dir, '*')))
+    image_filenames = _get_all_files(image_dir)
+    print(f"detected {len(image_filenames)} images ...")
     if len(image_filenames) == 0:
         error('No input images found')
     img = np.asarray(PIL.Image.open(image_filenames[0]))
@@ -525,6 +537,8 @@ def create_from_images(tfrecord_dir, image_dir, shuffle):
                 img = img[np.newaxis, :, :] # HW => CHW
             else:
                 img = img.transpose([2, 0, 1]) # HWC => CHW
+            if img.shape[0] > 3:
+                img = img[:3, ...]
             tfr.add_image(img)
 
 #----------------------------------------------------------------------------
