@@ -530,7 +530,8 @@ def D_basic(
     assert resolution == 2**resolution_log2 and resolution >= 4
     def nf(stage): return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
     def blur(in_x): return blur2d(in_x, blur_filter) if blur_filter else in_x
-    def conv1x1(x_in, fmaps): return conv2d(x_in, fmaps, kernel=1, use_wscale=use_wscale)
+    # conv1x1 is not required in this branch
+    # def conv1x1(x_in, fmaps): return conv2d(x_in, fmaps, kernel=1, use_wscale=use_wscale)
     act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[nonlinearity]
 
     labels_in = inputs_in[-1]
@@ -552,7 +553,8 @@ def D_basic(
         with tf.variable_scope('%dx%d' % (2 ** in_res, 2 ** in_res)):
             if g_img is not None:  # the combine function is a learnable 1x1 conv layer
                 with tf.variable_scope("combine"):
-                    in_x = conv1x1(tf.concat((in_x, g_img), axis=1), nf(in_res - 1))
+                    # combine function is just a plain old concatenation
+                    in_x = tf.concat((in_x, g_img), axis=1)
             if mbstd_group_size > 1:
                 in_x = minibatch_stddev_layer(in_x, mbstd_group_size, mbstd_num_features)
             if in_res >= 3: # 8x8 and up
