@@ -1,17 +1,10 @@
-﻿# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
-#
-# This work is licensed under the Creative Commons Attribution-NonCommercial
-# 4.0 International License. To view a copy of this license, visit
-# http://creativecommons.org/licenses/by-nc/4.0/ or send a letter to
-# Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
-
-"""Miscellaneous helper utils for Tensorflow."""
+﻿"""Miscellaneous helper utils for Tensorflow."""
 
 import os
+from typing import Any, Iterable, List, Union
+
 import numpy as np
 import tensorflow as tf
-
-from typing import Any, Iterable, List, Union
 
 TfExpression = Union[tf.Tensor, tf.Variable, tf.Operation]
 """A type that represents a valid Tensorflow expression."""
@@ -73,17 +66,27 @@ def absolute_name_scope(scope: str) -> tf.name_scope:
 
 def absolute_variable_scope(scope: str, **kwargs) -> tf.variable_scope:
     """Forcefully enter the specified variable scope, ignoring any surrounding scopes."""
-    return tf.variable_scope(tf.VariableScope(name=scope, **kwargs), auxiliary_name_scope=False)
+    return tf.variable_scope(
+        tf.VariableScope(name=scope, **kwargs), auxiliary_name_scope=False
+    )
 
 
 def _sanitize_tf_config(config_dict: dict = None) -> dict:
     # Defaults.
     cfg = dict()
-    cfg["rnd.np_random_seed"]               = None      # Random seed for NumPy. None = keep as is.
-    cfg["rnd.tf_random_seed"]               = "auto"    # Random seed for TensorFlow. 'auto' = derive from NumPy random state. None = keep as is.
-    cfg["env.TF_CPP_MIN_LOG_LEVEL"]         = "1"       # 0 = Print all available debug info from TensorFlow. 1 = Print warnings and errors, but disable debug info.
-    cfg["graph_options.place_pruned_graph"] = True      # False = Check that all ops are available on the designated device. True = Skip the check for ops that are not used.
-    cfg["gpu_options.allow_growth"]         = False     # False = Allocate all GPU memory at the beginning. True = Allocate only as much GPU memory as needed.
+    cfg["rnd.np_random_seed"] = None  # Random seed for NumPy. None = keep as is.
+    cfg[
+        "rnd.tf_random_seed"
+    ] = "auto"  # Random seed for TensorFlow. 'auto' = derive from NumPy random state. None = keep as is.
+    cfg[
+        "env.TF_CPP_MIN_LOG_LEVEL"
+    ] = "1"  # 0 = Print all available debug info from TensorFlow. 1 = Print warnings and errors, but disable debug info.
+    cfg[
+        "graph_options.place_pruned_graph"
+    ] = True  # False = Check that all ops are available on the designated device. True = Skip the check for ops that are not used.
+    cfg[
+        "gpu_options.allow_growth"
+    ] = False  # False = Allocate all GPU memory at the beginning. True = Allocate only as much GPU memory as needed.
 
     # User overrides.
     if config_dict is not None:
@@ -122,10 +125,14 @@ def init_tf(config_dict: dict = None) -> None:
 def assert_tf_initialized():
     """Check that TensorFlow session has been initialized."""
     if tf.get_default_session() is None:
-        raise RuntimeError("No default TensorFlow session found. Please call dnnlib.tflib.init_tf().")
+        raise RuntimeError(
+            "No default TensorFlow session found. Please call dnnlib.tflib.init_tf()."
+        )
 
 
-def create_session(config_dict: dict = None, force_as_default: bool = False) -> tf.Session:
+def create_session(
+    config_dict: dict = None, force_as_default: bool = False
+) -> tf.Session:
     """Create tf.Session based on config dict."""
     # Setup TensorFlow config proto.
     cfg = _sanitize_tf_config(config_dict)
@@ -144,7 +151,7 @@ def create_session(config_dict: dict = None, force_as_default: bool = False) -> 
         # pylint: disable=protected-access
         session._default_session = session.as_default()
         session._default_session.enforce_nesting = False
-        session._default_session.__enter__() # pylint: disable=no-member
+        session._default_session.__enter__()  # pylint: disable=no-member
 
     return session
 
@@ -167,7 +174,9 @@ def init_uninitialized_vars(target_vars: List[tf.Variable] = None) -> None:
             assert is_tf_expression(var)
 
             try:
-                tf.get_default_graph().get_tensor_by_name(var.name.replace(":0", "/IsVariableInitialized:0"))
+                tf.get_default_graph().get_tensor_by_name(
+                    var.name.replace(":0", "/IsVariableInitialized:0")
+                )
             except KeyError:
                 # Op does not exist => variable may be uninitialized.
                 test_vars.append(var)
@@ -193,11 +202,19 @@ def set_vars(var_to_value_dict: dict) -> None:
         assert is_tf_expression(var)
 
         try:
-            setter = tf.get_default_graph().get_tensor_by_name(var.name.replace(":0", "/setter:0"))  # look for existing op
+            setter = tf.get_default_graph().get_tensor_by_name(
+                var.name.replace(":0", "/setter:0")
+            )  # look for existing op
         except KeyError:
             with absolute_name_scope(var.name.split(":")[0]):
-                with tf.control_dependencies(None):  # ignore surrounding control_dependencies
-                    setter = tf.assign(var, tf.placeholder(var.dtype, var.shape, "new_value"), name="setter")  # create new setter
+                with tf.control_dependencies(
+                    None
+                ):  # ignore surrounding control_dependencies
+                    setter = tf.assign(
+                        var,
+                        tf.placeholder(var.dtype, var.shape, "new_value"),
+                        name="setter",
+                    )  # create new setter
 
         ops.append(setter)
         feed_dict[setter.op.inputs[1]] = value
@@ -215,7 +232,7 @@ def create_var_with_large_initial_value(initial_value: np.ndarray, *args, **kwar
     return var
 
 
-def convert_images_from_uint8(*images, drange=[-1,1], nhwc_to_nchw=False):
+def convert_images_from_uint8(*images, drange=[-1, 1], nhwc_to_nchw=False):
     """Convert a minibatch of images from uint8 to float32 with configurable dynamic range.
     Can be used as an input transformation for Network.run().
     """
@@ -226,15 +243,19 @@ def convert_images_from_uint8(*images, drange=[-1,1], nhwc_to_nchw=False):
     return images[0] if len(images) == 1 else images
 
 
-def convert_images_to_uint8(*images, drange=[-1,1], nchw_to_nhwc=False, shrink=1):
+def convert_images_to_uint8(*images, drange=[-1, 1], nchw_to_nhwc=False, shrink=1):
     """Convert a minibatch of images from float32 to uint8 with configurable dynamic range.
     Can be used as an output transformation for Network.run().
     """
     images = [tf.cast(image, tf.float32) for image in images]
     if shrink > 1:
         ksize = [1, 1, shrink, shrink]
-        images = [tf.nn.avg_pool(image, ksize=ksize, strides=ksize, padding="VALID", data_format="NCHW")
-                  for image in images]
+        images = [
+            tf.nn.avg_pool(
+                image, ksize=ksize, strides=ksize, padding="VALID", data_format="NCHW"
+            )
+            for image in images
+        ]
     if nchw_to_nhwc:
         images = [tf.transpose(image, [0, 2, 3, 1]) for image in images]
     scale = 255 / (drange[1] - drange[0])

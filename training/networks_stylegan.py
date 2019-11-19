@@ -1,18 +1,20 @@
 ﻿"""Network architectures used for the MSG-StyleGAN :)"""
 
-import numpy as np
-import tensorflow as tf
 import dnnlib
 import dnnlib.tflib as tflib
+import numpy as np
+import tensorflow as tf
+
 
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Primitive ops for manipulating 4D activation tensors.
 # The gradients of these are not necessary efficient or even meaningful.
 
-def _blur2d(x, f=[1,2,1], normalize=True, flip=False, stride=1):
+
+def _blur2d(x, f=[1, 2, 1], normalize=True, flip=False, stride=1):
     assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
     assert isinstance(stride, int) and stride >= 1
 
@@ -29,17 +31,20 @@ def _blur2d(x, f=[1,2,1], normalize=True, flip=False, stride=1):
     f = np.tile(f, [1, 1, int(x.shape[1]), 1])
 
     # No-op => early exit.
-    if f.shape == (1, 1) and f[0,0] == 1:
+    if f.shape == (1, 1) and f[0, 0] == 1:
         return x
 
     # Convolve using depthwise_conv2d.
     orig_dtype = x.dtype
     x = tf.cast(x, tf.float32)  # tf.nn.depthwise_conv2d() doesn't support fp16
-    f = tf.constant(f, dtype=x.dtype, name='filter')
+    f = tf.constant(f, dtype=x.dtype, name="filter")
     strides = [1, 1, stride, stride]
-    x = tf.nn.depthwise_conv2d(x, f, strides=strides, padding='SAME', data_format='NCHW')
+    x = tf.nn.depthwise_conv2d(
+        x, f, strides=strides, padding="SAME", data_format="NCHW"
+    )
     x = tf.cast(x, orig_dtype)
     return x
+
 
 def _upscale2d(x, factor=2, gain=1):
     assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
@@ -59,6 +64,7 @@ def _upscale2d(x, factor=2, gain=1):
     x = tf.tile(x, [1, 1, 1, factor, 1, factor])
     x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     return x
+
 
 def _downscale2d(x, factor=2, gain=1):
     assert x.shape.ndims == 4 and all(dim.value is not None for dim in x.shape[1:])
@@ -80,54 +86,71 @@ def _downscale2d(x, factor=2, gain=1):
     # Large factor => downscale using tf.nn.avg_pool().
     # NOTE: Requires tf_config['graph_options.place_pruned_graph']=True to work.
     ksize = [1, 1, factor, factor]
-    return tf.nn.avg_pool(x, ksize=ksize, strides=ksize, padding='VALID', data_format='NCHW')
+    return tf.nn.avg_pool(
+        x, ksize=ksize, strides=ksize, padding="VALID", data_format="NCHW"
+    )
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # High-level ops for manipulating 4D activation tensors.
 # The gradients of these are meant to be as efficient as possible.
 
-def blur2d(x, f=[1,2,1], normalize=True):
-    with tf.variable_scope('Blur2D'):
+
+def blur2d(x, f=[1, 2, 1], normalize=True):
+    with tf.variable_scope("Blur2D"):
         @tf.custom_gradient
         def func(in_x):
             y = _blur2d(in_x, f, normalize)
+
             @tf.custom_gradient
             def grad(dy):
                 dx = _blur2d(dy, f, normalize, flip=True)
                 return dx, lambda ddx: _blur2d(ddx, f, normalize)
+
             return y, grad
+
         return func(x)
 
+
 def upscale2d(x, factor=2):
-    with tf.variable_scope('Upscale2D'):
+    with tf.variable_scope("Upscale2D"):
         @tf.custom_gradient
         def func(in_x):
             y = _upscale2d(in_x, factor)
+
             @tf.custom_gradient
             def grad(dy):
-                dx = _downscale2d(dy, factor, gain=factor**2)
+                dx = _downscale2d(dy, factor, gain=factor ** 2)
                 return dx, lambda ddx: _upscale2d(ddx, factor)
+
             return y, grad
+
         return func(x)
 
+
 def downscale2d(x, factor=2):
-    with tf.variable_scope('Downscale2D'):
+    with tf.variable_scope("Downscale2D"):
         @tf.custom_gradient
         def func(in_x):
             y = _downscale2d(in_x, factor)
+
             @tf.custom_gradient
             def grad(dy):
-                dx = _upscale2d(dy, factor, gain=1/factor**2)
+                dx = _upscale2d(dy, factor, gain=1 / factor ** 2)
                 return dx, lambda ddx: _downscale2d(ddx, factor)
+
             return y, grad
+
         return func(x)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Get/create weight tensor for a convolutional or fully-connected layer.
 
+
 def get_weight(shape, gain=np.sqrt(2), use_wscale=False, lrmul=1):
-    fan_in = np.prod(shape[:-1]) # [kernel, kernel, fmaps_in, fmaps_out] or [in, out]
-    he_std = gain / np.sqrt(fan_in) # He init
+    fan_in = np.prod(shape[:-1])  # [kernel, kernel, fmaps_in, fmaps_out] or [in, out]
+    he_std = gain / np.sqrt(fan_in)  # He init
 
     # Equalized learning rate and custom learning rate multiplier.
     if use_wscale:
@@ -139,10 +162,12 @@ def get_weight(shape, gain=np.sqrt(2), use_wscale=False, lrmul=1):
 
     # Create variable.
     init = tf.initializers.random_normal(0, init_std)
-    return tf.get_variable('weight', shape=shape, initializer=init) * runtime_coef
+    return tf.get_variable("weight", shape=shape, initializer=init) * runtime_coef
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Fully-connected layer.
+
 
 def dense(x, fmaps, **kwargs):
     if len(x.shape) > 2:
@@ -151,23 +176,27 @@ def dense(x, fmaps, **kwargs):
     w = tf.cast(w, x.dtype)
     return tf.matmul(x, w)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Convolutional layer.
+
 
 def conv2d(x, fmaps, kernel, **kwargs):
     assert kernel >= 1 and kernel % 2 == 1
     w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
     w = tf.cast(w, x.dtype)
-    return tf.nn.conv2d(x, w, strides=[1,1,1,1], padding='SAME', data_format='NCHW')
+    return tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding="SAME", data_format="NCHW")
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Fused convolution + scaling.
 # Faster and uses less memory than performing the operations separately.
 
-def upscale2d_conv2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
+
+def upscale2d_conv2d(x, fmaps, kernel, fused_scale="auto", **kwargs):
     assert kernel >= 1 and kernel % 2 == 1
-    assert fused_scale in [True, False, 'auto']
-    if fused_scale == 'auto':
+    assert fused_scale in [True, False, "auto"]
+    if fused_scale == "auto":
         fused_scale = min(x.shape[2:]) * 2 >= 128
 
     # Not fused => call the individual ops directly.
@@ -176,17 +205,20 @@ def upscale2d_conv2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
 
     # Fused => perform both ops simultaneously using tf.nn.conv2d_transpose().
     w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
-    w = tf.transpose(w, [0, 1, 3, 2]) # [kernel, kernel, fmaps_out, fmaps_in]
-    w = tf.pad(w, [[1,1], [1,1], [0,0], [0,0]], mode='CONSTANT')
+    w = tf.transpose(w, [0, 1, 3, 2])  # [kernel, kernel, fmaps_out, fmaps_in]
+    w = tf.pad(w, [[1, 1], [1, 1], [0, 0], [0, 0]], mode="CONSTANT")
     w = tf.add_n([w[1:, 1:], w[:-1, 1:], w[1:, :-1], w[:-1, :-1]])
     w = tf.cast(w, x.dtype)
     os = [tf.shape(x)[0], fmaps, x.shape[2] * 2, x.shape[3] * 2]
-    return tf.nn.conv2d_transpose(x, w, os, strides=[1,1,2,2], padding='SAME', data_format='NCHW')
+    return tf.nn.conv2d_transpose(
+        x, w, os, strides=[1, 1, 2, 2], padding="SAME", data_format="NCHW"
+    )
 
-def conv2d_downscale2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
+
+def conv2d_downscale2d(x, fmaps, kernel, fused_scale="auto", **kwargs):
     assert kernel >= 1 and kernel % 2 == 1
-    assert fused_scale in [True, False, 'auto']
-    if fused_scale == 'auto':
+    assert fused_scale in [True, False, "auto"]
+    if fused_scale == "auto":
         fused_scale = min(x.shape[2:]) >= 128
 
     # Not fused => call the individual ops directly.
@@ -195,117 +227,160 @@ def conv2d_downscale2d(x, fmaps, kernel, fused_scale='auto', **kwargs):
 
     # Fused => perform both ops simultaneously using tf.nn.conv2d().
     w = get_weight([kernel, kernel, x.shape[1].value, fmaps], **kwargs)
-    w = tf.pad(w, [[1,1], [1,1], [0,0], [0,0]], mode='CONSTANT')
+    w = tf.pad(w, [[1, 1], [1, 1], [0, 0], [0, 0]], mode="CONSTANT")
     w = tf.add_n([w[1:, 1:], w[:-1, 1:], w[1:, :-1], w[:-1, :-1]]) * 0.25
     w = tf.cast(w, x.dtype)
-    return tf.nn.conv2d(x, w, strides=[1,1,2,2], padding='SAME', data_format='NCHW')
+    return tf.nn.conv2d(x, w, strides=[1, 1, 2, 2], padding="SAME", data_format="NCHW")
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Apply bias to the given activation tensor.
 
+
 def apply_bias(x, lrmul=1):
-    b = tf.get_variable('bias', shape=[x.shape[1]], initializer=tf.initializers.zeros()) * lrmul
+    b = (
+            tf.get_variable("bias", shape=[x.shape[1]], initializer=tf.initializers.zeros())
+            * lrmul
+    )
     b = tf.cast(b, x.dtype)
     if len(x.shape) == 2:
         return x + b
     return x + tf.reshape(b, [1, -1, 1, 1])
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Leaky ReLU activation. More efficient than tf.nn.leaky_relu() and supports FP16.
 
+
 def leaky_relu(x, alpha=0.2):
-    with tf.variable_scope('LeakyReLU'):
-        alpha = tf.constant(alpha, dtype=x.dtype, name='alpha')
+    with tf.variable_scope("LeakyReLU"):
+        alpha = tf.constant(alpha, dtype=x.dtype, name="alpha")
+
         @tf.custom_gradient
         def func(in_x):
             y = tf.maximum(in_x, in_x * alpha)
+
             @tf.custom_gradient
             def grad(dy):
                 dx = tf.where(y >= 0, dy, dy * alpha)
                 return dx, lambda ddx: tf.where(y >= 0, ddx, ddx * alpha)
+
             return y, grad
+
         return func(x)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Pixelwise feature vector normalization.
 
-def pixel_norm(x, epsilon=1e-8):
-    with tf.variable_scope('PixelNorm'):
-        epsilon = tf.constant(epsilon, dtype=x.dtype, name='epsilon')
-        return x * tf.rsqrt(tf.reduce_mean(tf.square(x), axis=1, keepdims=True) + epsilon)
 
-#----------------------------------------------------------------------------
+def pixel_norm(x, epsilon=1e-8):
+    with tf.variable_scope("PixelNorm"):
+        epsilon = tf.constant(epsilon, dtype=x.dtype, name="epsilon")
+        return x * tf.rsqrt(
+            tf.reduce_mean(tf.square(x), axis=1, keepdims=True) + epsilon
+        )
+
+
+# ----------------------------------------------------------------------------
 # Instance normalization.
 
+
 def instance_norm(x, epsilon=1e-8):
-    assert len(x.shape) == 4 # NCHW
-    with tf.variable_scope('InstanceNorm'):
+    assert len(x.shape) == 4  # NCHW
+    with tf.variable_scope("InstanceNorm"):
         orig_dtype = x.dtype
         x = tf.cast(x, tf.float32)
-        x -= tf.reduce_mean(x, axis=[2,3], keepdims=True)
-        epsilon = tf.constant(epsilon, dtype=x.dtype, name='epsilon')
-        x *= tf.rsqrt(tf.reduce_mean(tf.square(x), axis=[2,3], keepdims=True) + epsilon)
+        x -= tf.reduce_mean(x, axis=[2, 3], keepdims=True)
+        epsilon = tf.constant(epsilon, dtype=x.dtype, name="epsilon")
+        x *= tf.rsqrt(
+            tf.reduce_mean(tf.square(x), axis=[2, 3], keepdims=True) + epsilon
+        )
         x = tf.cast(x, orig_dtype)
         return x
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Style modulation.
 
-def style_mod(x, dlatent, **kwargs):
-    with tf.variable_scope('StyleMod'):
-        style = apply_bias(dense(dlatent, fmaps=x.shape[1]*2, gain=1, **kwargs))
-        style = tf.reshape(style, [-1, 2, x.shape[1]] + [1] * (len(x.shape) - 2))
-        return x * (style[:,0] + 1) + style[:,1] # TOOD: check if there is a mistake here.
 
-#----------------------------------------------------------------------------
+def style_mod(x, dlatent, **kwargs):
+    with tf.variable_scope("StyleMod"):
+        style = apply_bias(dense(dlatent, fmaps=x.shape[1] * 2, gain=1, **kwargs))
+        style = tf.reshape(style, [-1, 2, x.shape[1]] + [1] * (len(x.shape) - 2))
+        return (
+                x * (style[:, 0] + 1) + style[:, 1]
+        )  # TOOD: check if there is a mistake here.
+
+
+# ----------------------------------------------------------------------------
 # Noise input.
 
+
 def apply_noise(x, noise_var=None, randomize_noise=True):
-    assert len(x.shape) == 4 # NCHW
-    with tf.variable_scope('Noise'):
+    assert len(x.shape) == 4  # NCHW
+    with tf.variable_scope("Noise"):
         if noise_var is None or randomize_noise:
-            noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
+            noise = tf.random_normal(
+                [tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype
+            )
         else:
             noise = tf.cast(noise_var, x.dtype)
-        weight = tf.get_variable('weight', shape=[x.shape[1].value], initializer=tf.initializers.zeros())
+        weight = tf.get_variable(
+            "weight", shape=[x.shape[1].value], initializer=tf.initializers.zeros()
+        )
         return x + noise * tf.reshape(tf.cast(weight, x.dtype), [1, -1, 1, 1])
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Minibatch standard deviation.
 
-def minibatch_stddev_layer(x, group_size=4, num_new_features=1):
-    with tf.variable_scope('MinibatchStddev'):
-        group_size = tf.minimum(group_size, tf.shape(x)[0])     # Minibatch must be divisible by (or smaller than) group_size.
-        s = x.shape                                             # [NCHW]  Input shape.
-        y = tf.reshape(x, [group_size, -1, num_new_features, s[1]//num_new_features, s[2], s[3]])   # [GMncHW] Split minibatch into M groups of size G. Split channels into n channel groups c.
-        y = tf.cast(y, tf.float32)                              # [GMncHW] Cast to FP32.
-        y -= tf.reduce_mean(y, axis=0, keepdims=True)           # [GMncHW] Subtract mean over group.
-        y = tf.reduce_mean(tf.square(y), axis=0)                # [MncHW]  Calc variance over group.
-        y = tf.sqrt(y + 1e-8)                                   # [MncHW]  Calc stddev over group.
-        y = tf.reduce_mean(y, axis=[2,3,4], keepdims=True)      # [Mn111]  Take average over fmaps and pixels.
-        y = tf.reduce_mean(y, axis=[2])                         # [Mn11] Split channels into c channel groups
-        y = tf.cast(y, x.dtype)                                 # [Mn11]  Cast back to original data type.
-        y = tf.tile(y, [group_size, 1, s[2], s[3]])             # [NnHW]  Replicate over group and pixels.
-        return tf.concat([x, y], axis=1)                        # [NCHW]  Append as new fmap.
 
-#----------------------------------------------------------------------------
+def minibatch_stddev_layer(x, group_size=4, num_new_features=1):
+    with tf.variable_scope("MinibatchStddev"):
+        group_size = tf.minimum(
+            group_size, tf.shape(x)[0]
+        )  # Minibatch must be divisible by (or smaller than) group_size.
+        s = x.shape  # [NCHW]  Input shape.
+        y = tf.reshape(
+            x, [group_size, -1, num_new_features, s[1] // num_new_features, s[2], s[3]]
+        )  # [GMncHW] Split minibatch into M groups of size G. Split channels into n channel groups c.
+        y = tf.cast(y, tf.float32)  # [GMncHW] Cast to FP32.
+        y -= tf.reduce_mean(
+            y, axis=0, keepdims=True
+        )  # [GMncHW] Subtract mean over group.
+        y = tf.reduce_mean(tf.square(y), axis=0)  # [MncHW]  Calc variance over group.
+        y = tf.sqrt(y + 1e-8)  # [MncHW]  Calc stddev over group.
+        y = tf.reduce_mean(
+            y, axis=[2, 3, 4], keepdims=True
+        )  # [Mn111]  Take average over fmaps and pixels.
+        y = tf.reduce_mean(y, axis=[2])  # [Mn11] Split channels into c channel groups
+        y = tf.cast(y, x.dtype)  # [Mn11]  Cast back to original data type.
+        y = tf.tile(
+            y, [group_size, 1, s[2], s[3]]
+        )  # [NnHW]  Replicate over group and pixels.
+        return tf.concat([x, y], axis=1)  # [NCHW]  Append as new fmap.
+
+
+# ----------------------------------------------------------------------------
 # Style-based generator used in the StyleGAN paper.
 # Composed of two sub-networks (G_mapping and G_synthesis) that are defined below.
 
 # Animesh note: Mixing regularization is not possible for the MSG-GAN.
 # But, TODO: check if the figure 3 (from paper) can still be created and made sense with.
 def G_style(
-    latents_in,                                     # First input: Latent vectors (Z) [minibatch, latent_size].
-    labels_in,                                      # Second input: Conditioning labels [minibatch, label_size].
-    truncation_psi          = 0.7,                  # Style strength multiplier for the truncation trick. None = disable.
-    truncation_cutoff       = 8,                    # Number of layers for which to apply the truncation trick. None = disable.
-    truncation_psi_val      = None,                 # Value for truncation_psi to use during validation.
-    truncation_cutoff_val   = None,                 # Value for truncation_cutoff to use during validation.
-    dlatent_avg_beta        = 0.995,                # Decay for tracking the moving average of W during training. None = disable.
-    is_training             = False,                # Network is under training? Enables and disables specific features.
-    is_validation           = False,                # Network is under validation? Chooses which value to use for truncation_psi.
-    components              = dnnlib.EasyDict(),    # Container for sub-networks. Retained between calls.
-    **kwargs):                                      # Arguments for sub-networks (G_mapping and G_synthesis).
+        latents_in,  # First input: Latent vectors (Z) [minibatch, latent_size].
+        labels_in,  # Second input: Conditioning labels [minibatch, label_size].
+        truncation_psi=0.7,  # Style strength multiplier for the truncation trick. None = disable.
+        truncation_cutoff=8,  # Number of layers for which to apply the truncation trick. None = disable.
+        truncation_psi_val=None,  # Value for truncation_psi to use during validation.
+        truncation_cutoff_val=None,  # Value for truncation_cutoff to use during validation.
+        dlatent_avg_beta=0.995,  # Decay for tracking the moving average of W during training. None = disable.
+        is_training=False,  # Network is under training? Enables and disables specific features.
+        is_validation=False,  # Network is under validation? Chooses which value to use for truncation_psi.
+        components=dnnlib.EasyDict(),  # Container for sub-networks. Retained between calls.
+        **kwargs
+):  # Arguments for sub-networks (G_mapping and G_synthesis).
 
     # Validate arguments.
     assert not is_training or not is_validation
@@ -313,38 +388,65 @@ def G_style(
     if is_validation:
         truncation_psi = truncation_psi_val
         truncation_cutoff = truncation_cutoff_val
-    if is_training or (truncation_psi is not None and not tflib.is_tf_expression(truncation_psi) and truncation_psi == 1):
+    if is_training or (
+            truncation_psi is not None
+            and not tflib.is_tf_expression(truncation_psi)
+            and truncation_psi == 1
+    ):
         truncation_psi = None
-    if is_training or (truncation_cutoff is not None and not tflib.is_tf_expression(truncation_cutoff) and truncation_cutoff <= 0):
+    if is_training or (
+            truncation_cutoff is not None
+            and not tflib.is_tf_expression(truncation_cutoff)
+            and truncation_cutoff <= 0
+    ):
         truncation_cutoff = None
-    if not is_training or (dlatent_avg_beta is not None and not tflib.is_tf_expression(dlatent_avg_beta) and dlatent_avg_beta == 1):
+    if not is_training or (
+            dlatent_avg_beta is not None
+            and not tflib.is_tf_expression(dlatent_avg_beta)
+            and dlatent_avg_beta == 1
+    ):
         dlatent_avg_beta = None
 
     # Setup components.
-    if 'synthesis' not in components:
-        components.synthesis = tflib.Network(num_inputs=1, name='G_synthesis', func_name=G_synthesis, **kwargs)
+    if "synthesis" not in components:
+        components.synthesis = tflib.Network(
+            num_inputs=1, name="G_synthesis", func_name=G_synthesis, **kwargs
+        )
     num_layers = components.synthesis.input_shape[1]
     dlatent_size = components.synthesis.input_shape[2]
-    if 'mapping' not in components:
-        components.mapping = tflib.Network(num_inputs=2, name='G_mapping', func_name=G_mapping, dlatent_broadcast=num_layers, **kwargs)
+    if "mapping" not in components:
+        components.mapping = tflib.Network(
+            num_inputs=2,
+            name="G_mapping",
+            func_name=G_mapping,
+            dlatent_broadcast=num_layers,
+            **kwargs
+        )
 
     # Setup variables.
-    dlatent_avg = tf.get_variable('dlatent_avg', shape=[dlatent_size], initializer=tf.initializers.zeros(), trainable=False)
+    dlatent_avg = tf.get_variable(
+        "dlatent_avg",
+        shape=[dlatent_size],
+        initializer=tf.initializers.zeros(),
+        trainable=False,
+    )
 
     # Evaluate mapping network.
     dlatents = components.mapping.get_output_for(latents_in, labels_in, **kwargs)
 
     # Update moving average of W.
     if dlatent_avg_beta is not None:
-        with tf.variable_scope('DlatentAvg'):
+        with tf.variable_scope("DlatentAvg"):
             batch_avg = tf.reduce_mean(dlatents[:, 0], axis=0)
-            update_op = tf.assign(dlatent_avg, tflib.lerp(batch_avg, dlatent_avg, dlatent_avg_beta))
+            update_op = tf.assign(
+                dlatent_avg, tflib.lerp(batch_avg, dlatent_avg, dlatent_avg_beta)
+            )
             with tf.control_dependencies([update_op]):
                 dlatents = tf.identity(dlatents)
 
     # Apply truncation trick.
     if truncation_psi is not None and truncation_cutoff is not None:
-        with tf.variable_scope('Truncation'):
+        with tf.variable_scope("Truncation"):
             layer_idx = np.arange(num_layers)[np.newaxis, :, np.newaxis]
             ones = np.ones(layer_idx.shape, dtype=np.float32)
             coefs = tf.where(layer_idx < truncation_cutoff, truncation_psi * ones, ones)
@@ -354,26 +456,32 @@ def G_style(
     images_out = components.synthesis.get_output_for(dlatents, **kwargs)
     return images_out
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Mapping network used in the StyleGAN paper.
 
-def G_mapping(
-    latents_in,                             # First input: Latent vectors (Z) [minibatch, latent_size].
-    labels_in,                              # Second input: Conditioning labels [minibatch, label_size].
-    latent_size             = 512,          # Latent vector (Z) dimensionality.
-    label_size              = 0,            # Label dimensionality, 0 if no labels.
-    dlatent_size            = 512,          # Disentangled latent (W) dimensionality.
-    dlatent_broadcast       = None,         # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
-    mapping_layers          = 8,            # Number of mapping layers.
-    mapping_fmaps           = 512,          # Number of activations in the mapping layers.
-    mapping_lrmul           = 0.01,         # Learning rate multiplier for the mapping layers.
-    mapping_nonlinearity    = 'lrelu',      # Activation function: 'relu', 'lrelu'.
-    use_wscale              = True,         # Enable equalized learning rate?
-    normalize_latents       = True,         # Normalize latent vectors (Z) before feeding them to the mapping layers?
-    dtype                   = 'float32',    # Data type to use for activations and outputs.
-    **_kwargs):                             # Ignore unrecognized keyword args.
 
-    act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[mapping_nonlinearity]
+def G_mapping(
+        latents_in,  # First input: Latent vectors (Z) [minibatch, latent_size].
+        labels_in,  # Second input: Conditioning labels [minibatch, label_size].
+        latent_size=512,  # Latent vector (Z) dimensionality.
+        label_size=0,  # Label dimensionality, 0 if no labels.
+        dlatent_size=512,  # Disentangled latent (W) dimensionality.
+        dlatent_broadcast=None,
+        # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
+        mapping_layers=8,  # Number of mapping layers.
+        mapping_fmaps=512,  # Number of activations in the mapping layers.
+        mapping_lrmul=0.01,  # Learning rate multiplier for the mapping layers.
+        mapping_nonlinearity="lrelu",  # Activation function: 'relu', 'lrelu'.
+        use_wscale=True,  # Enable equalized learning rate?
+        normalize_latents=True,  # Normalize latent vectors (Z) before feeding them to the mapping layers?
+        dtype="float32",  # Data type to use for activations and outputs.
+        **_kwargs
+):  # Ignore unrecognized keyword args.
+
+    act, gain = {"relu": (tf.nn.relu, np.sqrt(2)), "lrelu": (leaky_relu, np.sqrt(2))}[
+        mapping_nonlinearity
+    ]
 
     # Inputs.
     latents_in.set_shape([None, latent_size])
@@ -384,8 +492,12 @@ def G_mapping(
 
     # Embed labels and concatenate them with latents.
     if label_size:
-        with tf.variable_scope('LabelConcat'):
-            w = tf.get_variable('weight', shape=[label_size, latent_size], initializer=tf.initializers.random_normal())
+        with tf.variable_scope("LabelConcat"):
+            w = tf.get_variable(
+                "weight",
+                shape=[label_size, latent_size],
+                initializer=tf.initializers.random_normal(),
+            )
             y = tf.matmul(labels_in, tf.cast(w, dtype))
             x = tf.concat([x, y], axis=1)
 
@@ -395,50 +507,67 @@ def G_mapping(
 
     # Mapping layers.
     for layer_idx in range(mapping_layers):
-        with tf.variable_scope('Dense%d' % layer_idx):
+        with tf.variable_scope("Dense%d" % layer_idx):
             fmaps = dlatent_size if layer_idx == mapping_layers - 1 else mapping_fmaps
-            x = dense(x, fmaps=fmaps, gain=gain, use_wscale=use_wscale, lrmul=mapping_lrmul)
+            x = dense(
+                x, fmaps=fmaps, gain=gain, use_wscale=use_wscale, lrmul=mapping_lrmul
+            )
             x = apply_bias(x, lrmul=mapping_lrmul)
             x = act(x)
 
     # Broadcast.
     if dlatent_broadcast is not None:
-        with tf.variable_scope('Broadcast'):
+        with tf.variable_scope("Broadcast"):
             x = tf.tile(x[:, np.newaxis], [1, dlatent_broadcast, 1])
 
     # Output.
     assert x.dtype == tf.as_dtype(dtype)
-    return tf.identity(x, name='dlatents_out')
+    return tf.identity(x, name="dlatents_out")
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Synthesis network used in the StyleGAN paper.
 
+
 def G_synthesis(
-    dlatents_in,                        # Input: Disentangled latents (W) [minibatch, num_layers, dlatent_size].
-    dlatent_size        = 512,          # Disentangled latent (W) dimensionality.
-    num_channels        = 3,            # Number of output color channels.
-    resolution          = 1024,         # Output resolution.
-    fmap_base           = 8192,         # Overall multiplier for the number of feature maps.
-    fmap_decay          = 1.0,          # log2 feature map reduction when doubling the resolution.
-    fmap_max            = 512,          # Maximum number of feature maps in any layer.
-    use_styles          = True,         # Enable style inputs?
-    const_input_layer   = True,         # First layer is a learned constant?
-    use_noise           = True,         # Enable noise inputs?
-    randomize_noise     = True,         # True = randomize noise inputs every time (non-deterministic), False = read noise inputs from variables.
-    nonlinearity        = 'lrelu',      # Activation function: 'relu', 'lrelu'
-    use_wscale          = True,         # Enable equalized learning rate?
-    use_pixel_norm      = False,        # Enable pixelwise feature vector normalization?
-    use_instance_norm   = True,         # Enable instance normalization?
-    dtype               = 'float32',    # Data type to use for activations and outputs.
-    fused_scale         = 'auto',       # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
-    blur_filter         = [1,2,1],      # Low-pass filter to apply when resampling activations. None = no filtering.
-    **_kwargs):                         # Ignore unrecognized keyword args.
+        dlatents_in,  # Input: Disentangled latents (W) [minibatch, num_layers, dlatent_size].
+        dlatent_size=512,  # Disentangled latent (W) dimensionality.
+        num_channels=3,  # Number of output color channels.
+        resolution=1024,  # Output resolution.
+        fmap_base=8192,  # Overall multiplier for the number of feature maps.
+        fmap_decay=1.0,  # log2 feature map reduction when doubling the resolution.
+        fmap_max=512,  # Maximum number of feature maps in any layer.
+        use_styles=True,  # Enable style inputs?
+        const_input_layer=True,  # First layer is a learned constant?
+        use_noise=True,  # Enable noise inputs?
+        randomize_noise=True,
+        # True = randomize noise inputs every time (non-deterministic), False = read noise inputs from variables.
+        nonlinearity="lrelu",  # Activation function: 'relu', 'lrelu'
+        use_wscale=True,  # Enable equalized learning rate?
+        use_pixel_norm=False,  # Enable pixelwise feature vector normalization?
+        use_instance_norm=True,  # Enable instance normalization?
+        dtype="float32",  # Data type to use for activations and outputs.
+        fused_scale="auto",  # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
+        blur_filter=[
+            1,
+            2,
+            1,
+        ],  # Low-pass filter to apply when resampling activations. None = no filtering.
+        **_kwargs
+):  # Ignore unrecognized keyword args.
 
     resolution_log2 = int(np.log2(resolution))
-    assert resolution == 2**resolution_log2 and resolution >= 4
-    def nf(stage): return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
-    def blur(in_x): return blur2d(in_x, blur_filter) if blur_filter else in_x
-    act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[nonlinearity]
+    assert resolution == 2 ** resolution_log2 and resolution >= 4
+
+    def nf(stage):
+        return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
+
+    def blur(in_x):
+        return blur2d(in_x, blur_filter) if blur_filter else in_x
+
+    act, gain = {"relu": (tf.nn.relu, np.sqrt(2)), "lrelu": (leaky_relu, np.sqrt(2))}[
+        nonlinearity
+    ]
     num_layers = resolution_log2 * 2 - 2
     num_styles = num_layers if use_styles else 1
     images_out = []  # list will contain the output images at different resolutions
@@ -452,13 +581,22 @@ def G_synthesis(
     if use_noise:
         for layer_idx in range(num_layers):
             res = layer_idx // 2 + 2
-            shape = [1, use_noise, 2**res, 2**res]
-            noise_inputs.append(tf.get_variable('noise%d' % layer_idx, shape=shape, initializer=tf.initializers.random_normal(), trainable=False))
+            shape = [1, use_noise, 2 ** res, 2 ** res]
+            noise_inputs.append(
+                tf.get_variable(
+                    "noise%d" % layer_idx,
+                    shape=shape,
+                    initializer=tf.initializers.random_normal(),
+                    trainable=False,
+                )
+            )
 
     # Things to do at the end of each layer.
     def layer_epilogue(in_x, in_layer_idx):
         if use_noise:
-            in_x = apply_noise(in_x, noise_inputs[in_layer_idx], randomize_noise=randomize_noise)
+            in_x = apply_noise(
+                in_x, noise_inputs[in_layer_idx], randomize_noise=randomize_noise
+            )
         in_x = apply_bias(in_x)
         in_x = act(in_x)
         if use_pixel_norm:
@@ -470,30 +608,67 @@ def G_synthesis(
         return in_x
 
     # Early layers.
-    with tf.variable_scope('4x4'):
+    with tf.variable_scope("4x4"):
         if const_input_layer:
-            with tf.variable_scope('Const'):
-                x = tf.get_variable('const', shape=[1, nf(1), 4, 4], initializer=tf.initializers.ones())
-                x = layer_epilogue(tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1]), 0)
+            with tf.variable_scope("Const"):
+                x = tf.get_variable(
+                    "const", shape=[1, nf(1), 4, 4], initializer=tf.initializers.ones()
+                )
+                x = layer_epilogue(
+                    tf.tile(tf.cast(x, dtype), [tf.shape(dlatents_in)[0], 1, 1, 1]), 0
+                )
         else:
-            with tf.variable_scope('Dense'):
-                x = dense(dlatents_in[:, 0], fmaps=nf(1)*16, gain=gain/4, use_wscale=use_wscale) # tweak gain to match the official implementation of Progressing GAN
+            with tf.variable_scope("Dense"):
+                x = dense(
+                    dlatents_in[:, 0],
+                    fmaps=nf(1) * 16,
+                    gain=gain / 4,
+                    use_wscale=use_wscale,
+                )  # tweak gain to match the official implementation of Progressing GAN
                 x = layer_epilogue(tf.reshape(x, [-1, nf(1), 4, 4]), 0)
-        with tf.variable_scope('Conv'):
-            x = layer_epilogue(conv2d(x, fmaps=nf(1), kernel=3, gain=gain, use_wscale=use_wscale), 1)
+        with tf.variable_scope("Conv"):
+            x = layer_epilogue(
+                conv2d(x, fmaps=nf(1), kernel=3, gain=gain, use_wscale=use_wscale), 1
+            )
 
     # Building blocks for remaining layers.
-    def block(in_res, in_x): # res = 3..resolution_log2
-        with tf.variable_scope('%dx%d' % (2 ** in_res, 2 ** in_res)):
-            with tf.variable_scope('Conv0_up'):
-                in_x = layer_epilogue(blur(upscale2d_conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)), in_res * 2 - 4)
-            with tf.variable_scope('Conv1'):
-                in_x = layer_epilogue(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale), in_res * 2 - 3)
+    def block(in_res, in_x):  # res = 3..resolution_log2
+        with tf.variable_scope("%dx%d" % (2 ** in_res, 2 ** in_res)):
+            with tf.variable_scope("Conv0_up"):
+                in_x = layer_epilogue(
+                    blur(
+                        upscale2d_conv2d(
+                            in_x,
+                            fmaps=nf(in_res - 1),
+                            kernel=3,
+                            gain=gain,
+                            use_wscale=use_wscale,
+                            fused_scale=fused_scale,
+                        )
+                    ),
+                    in_res * 2 - 4,
+                )
+            with tf.variable_scope("Conv1"):
+                in_x = layer_epilogue(
+                    conv2d(
+                        in_x,
+                        fmaps=nf(in_res - 1),
+                        kernel=3,
+                        gain=gain,
+                        use_wscale=use_wscale,
+                    ),
+                    in_res * 2 - 3,
+                )
             return in_x
-    def torgb(in_res, in_x): # res = 2..resolution_log2
+
+    def torgb(in_res, in_x):  # res = 2..resolution_log2
         in_lod = resolution_log2 - in_res
-        with tf.variable_scope('ToRGB_lod%d' % in_lod):
-            return apply_bias(conv2d(in_x, fmaps=num_channels, kernel=1, gain=1, use_wscale=use_wscale))
+        with tf.variable_scope("ToRGB_lod%d" % in_lod):
+            return apply_bias(
+                conv2d(
+                    in_x, fmaps=num_channels, kernel=1, gain=1, use_wscale=use_wscale
+                )
+            )
 
     # Finally, arrange the computations for the layers
     images_out.append(torgb(2, x))
@@ -501,37 +676,61 @@ def G_synthesis(
         x = block(res, x)
         images_out.append(torgb(res, x))
 
-    assert all(image_out.dtype == tf.as_dtype(dtype) for image_out in images_out), \
-        "DataType is messed up during G_synthesis computations"
-    return tuple([tf.identity(image_out, name='images_out_'+str(2**res)+'x'+str(2**res))
-                  for res, image_out in enumerate(images_out, 2)])
+    assert all(
+        image_out.dtype == tf.as_dtype(dtype) for image_out in images_out
+    ), "DataType is messed up during G_synthesis computations"
+    return tuple(
+        [
+            tf.identity(
+                image_out, name="images_out_" + str(2 ** res) + "x" + str(2 ** res)
+            )
+            for res, image_out in enumerate(images_out, 2)
+        ]
+    )
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Discriminator used in the StyleGAN paper.
 
+
 def D_basic(
-    *inputs_in,                         # Input: List of images at different resolutions + labels
-    num_channels        = 1,            # Number of input color channels. Overridden based on dataset.
-    resolution          = 32,           # Input resolution. Overridden based on dataset.
-    label_size          = 0,            # Dimensionality of the labels, 0 if no labels. Overridden based on dataset.
-    fmap_base           = 8192,         # Overall multiplier for the number of feature maps.
-    fmap_decay          = 1.0,          # log2 feature map reduction when doubling the resolution.
-    fmap_max            = 512,          # Maximum number of feature maps in any layer.
-    nonlinearity        = 'lrelu',      # Activation function: 'relu', 'lrelu',
-    use_wscale          = True,         # Enable equalized learning rate?
-    mbstd_group_size    = 4,            # Group size for the minibatch standard deviation layer, 0 = disable.
-    mbstd_num_features  = 1,            # Number of features for the minibatch standard deviation layer.
-    dtype               = 'float32',    # Data type to use for activations and outputs.
-    fused_scale         = 'auto',       # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
-    blur_filter         = [1,2,1],      # Low-pass filter to apply when resampling activations. None = no filtering.
-    **_kwargs):                         # Ignore unrecognized keyword args.
+        *inputs_in,  # Input: List of images at different resolutions + labels
+        num_channels=1,  # Number of input color channels. Overridden based on dataset.
+        resolution=32,  # Input resolution. Overridden based on dataset.
+        label_size=0,  # Dimensionality of the labels, 0 if no labels. Overridden based on dataset.
+        fmap_base=8192,  # Overall multiplier for the number of feature maps.
+        fmap_decay=1.0,  # log2 feature map reduction when doubling the resolution.
+        fmap_max=512,  # Maximum number of feature maps in any layer.
+        nonlinearity="lrelu",  # Activation function: 'relu', 'lrelu',
+        use_wscale=True,  # Enable equalized learning rate?
+        mbstd_group_size=4,  # Group size for the minibatch standard deviation layer, 0 = disable.
+        mbstd_num_features=1,  # Number of features for the minibatch standard deviation layer.
+        dtype="float32",  # Data type to use for activations and outputs.
+        fused_scale="auto",  # True = fused convolution + scaling, False = separate ops, 'auto' = decide automatically.
+        blur_filter=[
+            1,
+            2,
+            1,
+        ],  # Low-pass filter to apply when resampling activations. None = no filtering.
+        **_kwargs
+):  # Ignore unrecognized keyword args.
 
     resolution_log2 = int(np.log2(resolution))
-    assert resolution == 2**resolution_log2 and resolution >= 4
-    def nf(stage): return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
-    def blur(in_x): return blur2d(in_x, blur_filter) if blur_filter else in_x
-    def conv1x1(x_in, fmaps): return conv2d(x_in, fmaps, kernel=1, use_wscale=use_wscale)
-    act, gain = {'relu': (tf.nn.relu, np.sqrt(2)), 'lrelu': (leaky_relu, np.sqrt(2))}[nonlinearity]
+
+    assert resolution == 2 ** resolution_log2 and resolution >= 4
+
+    def nf(stage):
+        return min(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_max)
+
+    def blur(in_x):
+        return blur2d(in_x, blur_filter) if blur_filter else in_x
+
+    def conv1x1(x_in, fmaps):
+        return conv2d(x_in, fmaps, kernel=1, use_wscale=use_wscale)
+
+    act, gain = {"relu": (tf.nn.relu, np.sqrt(2)), "lrelu": (leaky_relu, np.sqrt(2))}[
+        nonlinearity
+    ]
 
     labels_in = inputs_in[-1]
     images_in = inputs_in[:-1]
@@ -542,49 +741,108 @@ def D_basic(
     labels_in = tf.cast(labels_in, dtype)
 
     # Building blocks.
-    def fromrgb(in_x, in_res, full_maps=False): # res = 2..resolution_log2
-        with tf.variable_scope('FromRGB_lod%d' % (resolution_log2 - in_res)):
+    def fromrgb(in_x, in_res, full_maps=False):  # res = 2..resolution_log2
+        with tf.variable_scope("FromRGB_lod%d" % (resolution_log2 - in_res)):
             if full_maps:
-                return act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=1, use_wscale=use_wscale)))
-            return act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1) // 2, kernel=1, use_wscale=use_wscale)))
+                return act(
+                    apply_bias(
+                        conv2d(
+                            in_x, fmaps=nf(in_res - 1), kernel=1, use_wscale=use_wscale
+                        )
+                    )
+                )
+            return act(
+                apply_bias(
+                    conv2d(
+                        in_x, fmaps=nf(in_res - 1) // 2, kernel=1, use_wscale=use_wscale
+                    )
+                )
+            )
 
-    def block(in_x, in_res, g_img=None): # res = 2..resolution_log2
-        with tf.variable_scope('%dx%d' % (2 ** in_res, 2 ** in_res)):
+    def block(in_x, in_res, g_img=None):  # res = 2..resolution_log2
+        with tf.variable_scope("%dx%d" % (2 ** in_res, 2 ** in_res)):
             if g_img is not None:  # the combine function is a learnable 1x1 conv layer
                 with tf.variable_scope("combine"):
                     in_x = conv1x1(tf.concat((in_x, g_img), axis=1), nf(in_res - 1))
             if mbstd_group_size > 1:
-                in_x = minibatch_stddev_layer(in_x, mbstd_group_size, mbstd_num_features)
-            if in_res >= 3: # 8x8 and up
-                with tf.variable_scope('Conv0'):
-                    in_x = act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale)))
-                with tf.variable_scope('Conv1_down'):
-                    in_x = act(apply_bias(conv2d_downscale2d(blur(in_x), fmaps=nf(in_res - 2), kernel=3, gain=gain, use_wscale=use_wscale, fused_scale=fused_scale)))
-            else: # 4x4
-                with tf.variable_scope('Conv'):
-                    in_x = act(apply_bias(conv2d(in_x, fmaps=nf(in_res - 1), kernel=3, gain=gain, use_wscale=use_wscale)))
-                with tf.variable_scope('Dense0'):
-                    in_x = act(apply_bias(dense(in_x, fmaps=nf(in_res - 2), gain=gain, use_wscale=use_wscale)))
-                with tf.variable_scope('Dense1'):
-                    in_x = apply_bias(dense(in_x, fmaps=max(label_size, 1), gain=1, use_wscale=use_wscale))
+                in_x = minibatch_stddev_layer(
+                    in_x, mbstd_group_size, mbstd_num_features
+                )
+            if in_res >= 3:  # 8x8 and up
+                with tf.variable_scope("Conv0"):
+                    in_x = act(
+                        apply_bias(
+                            conv2d(
+                                in_x,
+                                fmaps=nf(in_res - 1),
+                                kernel=3,
+                                gain=gain,
+                                use_wscale=use_wscale,
+                            )
+                        )
+                    )
+                with tf.variable_scope("Conv1_down"):
+                    in_x = act(
+                        apply_bias(
+                            conv2d_downscale2d(
+                                blur(in_x),
+                                fmaps=nf(in_res - 2),
+                                kernel=3,
+                                gain=gain,
+                                use_wscale=use_wscale,
+                                fused_scale=fused_scale,
+                            )
+                        )
+                    )
+            else:  # 4x4
+                with tf.variable_scope("Conv"):
+                    in_x = act(
+                        apply_bias(
+                            conv2d(
+                                in_x,
+                                fmaps=nf(in_res - 1),
+                                kernel=3,
+                                gain=gain,
+                                use_wscale=use_wscale,
+                            )
+                        )
+                    )
+                with tf.variable_scope("Dense0"):
+                    in_x = act(
+                        apply_bias(
+                            dense(
+                                in_x,
+                                fmaps=nf(in_res - 2),
+                                gain=gain,
+                                use_wscale=use_wscale,
+                            )
+                        )
+                    )
+                with tf.variable_scope("Dense1"):
+                    in_x = apply_bias(
+                        dense(
+                            in_x,
+                            fmaps=max(label_size, 1),
+                            gain=1,
+                            use_wscale=use_wscale,
+                        )
+                    )
             return in_x
 
     # Fixed structure: simple and efficient, but does not support progressive growing.
     x = fromrgb(images_in[-1], resolution_log2, full_maps=True)
     x = block(x, resolution_log2)
-    for (img, res) in \
-            zip(reversed(images_in[:-1]),
-                range(resolution_log2 - 1, 2, -1)):
+    for (img, res) in zip(reversed(images_in[:-1]), range(resolution_log2 - 1, 2, -1)):
         x = block(x, res, img)
     scores_out = block(x, 2, images_in[0])
 
     # Label conditioning from "Which Training Methods for GANs do actually Converge?"
     if label_size:
-        with tf.variable_scope('LabelSwitch'):
+        with tf.variable_scope("LabelSwitch"):
             scores_out = tf.reduce_sum(scores_out * labels_in, axis=1, keepdims=True)
 
     assert scores_out.dtype == tf.as_dtype(dtype)
-    scores_out = tf.identity(scores_out, name='scores_out')
+    scores_out = tf.identity(scores_out, name="scores_out")
     return scores_out
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
