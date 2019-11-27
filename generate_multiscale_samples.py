@@ -17,7 +17,7 @@ from training.misc import dumb_upsample_nn
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser("MSG-StyleGAN image_generator")
+    parser = argparse.ArgumentParser("MSG-StyleGAN Multiscale image_generator")
     parser.add_argument(
         "--pickle_file",
         type=str,

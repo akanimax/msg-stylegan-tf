@@ -49,6 +49,14 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        "--truncation_psi",
+        action="store",
+        type=float,
+        default=0.6,
+        help="value of truncation psi used for generating the images",
+    )
+
+    parser.add_argument(
         "--num_samples",
         action="store",
         type=int,
@@ -64,26 +72,39 @@ def parse_arguments():
         help="to visualize the same point with only different realizations of noise",
     )
 
+    parser.add_argument(
+        "--run_stylegan",
+        action="store",
+        type=bool,
+        default=False,
+        help="Whether you are running an MSG-StyleGAN model or just styleGAN",
+    )
+
     args = parser.parse_args()
     return args
 
 
-def get_image(gen, point, out_depth):
+def get_image(gen, point, out_depth, truncation_psi=0.6, run_stylegan=False):
     """
     obtain an All-resolution grid of images from the given point
     :param gen: the generator object
     :param point: random latent point for generation
     :param out_depth: depth of network from where the images are to be generated
+    :param truncation_psi: value of truncation psi used for generating the images
+    :param run_stylegan: whether to use a stylegan pkl for generating the images?
     :return: img => generated image
     """
     fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
     point = np.expand_dims(point, axis=0)
     images = gen.run(
-        point, None, truncation_psi=0.6, randomize_noise=True, output_transform=fmt
+        point, None, truncation_psi=truncation_psi, randomize_noise=True, output_transform=fmt
     )
-    if out_depth is None or out_depth >= len(images):
-        out_depth = -1
-    return np.squeeze(images[out_depth])
+    if not run_stylegan:
+        if out_depth is None or out_depth >= len(images):
+            out_depth = -1
+        return np.squeeze(images[out_depth])
+    else:
+        return np.squeeze(images)
 
 
 def main(args):
@@ -114,7 +135,7 @@ def main(args):
 
     # animation mechanism
     start_point = np.expand_dims(all_latents[0], axis=0)
-    points = all_latents[1:]
+    points = all_latents
 
     # all points are start_point, if we have only noise realization
     if args.only_noise:
@@ -126,7 +147,7 @@ def main(args):
 
     print("Generating the requested number of samples ... ")
     for count, point in tqdm(enumerate(points, 1)):
-        image = get_image(Gs, point, args.out_depth)
+        image = get_image(Gs, point, args.out_depth, args.truncation_psi)
         imageio.imwrite(os.path.join(output_path, str(count) + ".png"), image)
 
     print(f"Requested images have been generated at: {output_path}")
