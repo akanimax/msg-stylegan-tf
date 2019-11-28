@@ -1,6 +1,17 @@
 # MSG-STYLEGAN-TF
 
-## 1.) Due Credit
+### Why this repository?
+So, our previous research work released the 
+[BMSG-GAN](https://github.com/akanimax/BMSG-GAN) code in PyTorch.
+This repository applies the Multi-scale Gradient connections 
+in StyleGAN. The switch to Tensorflow was primarily to ensure an
+apples-to-apples comparison with StyleGAN. 
+
+### Due Credit
+This code heavily uses NVIDIA's original 
+[StyleGAN](https://github.com/NVlabs/stylegan) code. We accredit and
+acknowledge their work here. The [Original License]() is located in 
+the base directory (file named `LICENSE_ORIGINAL.txt`).
 
 ## 2.) Repo introduction
 
