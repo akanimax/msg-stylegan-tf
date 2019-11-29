@@ -48,6 +48,11 @@ exceeds the performance in most of the cases we tried.
 
 ### Method overview
 
+<p align="center">
+<img alt="Architecture diagram" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/architecture_horizontal.jpg" />
+<br>
+</p>
+
 Architecture of MSG-GAN, shown here on the base model proposed in 
 ProGANs. Our architecture includes connections from the intermediate 
 layers of the generator to the intermediate layers of the 
