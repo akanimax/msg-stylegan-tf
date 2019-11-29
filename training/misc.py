@@ -64,7 +64,7 @@ def create_image_grid(images, grid_size=None):
     for idx in range(num):
         x = (idx % grid_w) * img_w
         y = (idx // grid_w) * img_h
-        grid[..., y : y + img_h, x : x + img_w] = images[idx]
+        grid[..., y: y + img_h, x: x + img_w] = images[idx]
     return grid
 
 
@@ -202,7 +202,7 @@ def locate_network_pkl(run_id_or_run_dir_or_network_pkl, snapshot_or_network_pkl
 
 def get_id_string_for_network_pkl(network_pkl):
     p = network_pkl.replace(".pkl", "").replace("\\", "/").split("/")
-    return "-".join(p[max(len(p) - 2, 0) :])
+    return "-".join(p[max(len(p) - 2, 0):])
 
 
 # ----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 # MSG-STYLEGAN-TF
-
+## Official code repository for the paper "MSG-GAN: Multi-Scale Gradients for Generative Adversarial Networks" [[arXiv]](https://arxiv.org/abs/1903.06048)
 <p align="center">
 <img alt="Teaser Diagram" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/teaser.jpg" />
 <br>
@@ -61,10 +61,63 @@ are concatenated with the corresponding activation volumes
 obtained from the main path of convolutional layers followed by a 
 combine function (shown in yellow).
 
+#### StyleGAN Modifications:
+The MSG-StyleGAN model (in this repository) uses all the
+modifications proposed by StyleGAN to the ProGANs architecture 
+except the mixing regularization. Similar to 
+MSG-ProGAN (diagram above), we use a 1 x 1 conv layer to obtain 
+the RGB images output from every block of the StyleGAN generator 
+leaving everything else (mapping network, non-traditional input and 
+style adaIN) untouched. The discriminator architecture is same as 
+the ProGANs (and consequently MSG-ProGAN) discriminator.
 
-### 4.) How to run the code (Training)
+### How to run the code (Training)
+Training can be run in the following 3 steps:
 
-### 5.) Opensourced models information (table)
+##### Step 1: Data formatting
+The MSG-StyleGAN training pipeline expects the dataset to be in 
+`tfrecord` format. This sped up the training to a great extent.
+Use the `dataset_tool.py` tool to generate these tfrecords from your 
+raw dataset. In order to use the tool, either select from the bunch 
+of datasets that it already provides or use the `create_from_images`
+option if you have a new dataset in the form of images. 
+For full options and more information run:
+
+    (your_virtual_env)$ python dataset_tool.py --help
+
+##### Step 2: Run the training script
+First step is to update the paths in the global configuration
+located in `config.py`. For instance:
+    
+    """Global configuration."""
+    
+    # ----------------------------------------------------------------------------
+    # Paths.
+        
+    result_dir = "/home/karnewar/self_research/msg-stylegan/"
+    data_dir = "/media/datasets_external/"
+    cache_dir = "/home/karnewar/self_research/msg-stylegan/cache"
+    run_dir_ignore = ["results", "datasets", "cache"]
+    
+    # ----------------------------------------------------------------------------
+
+The `result_dir` is where all the trained models, training logs and 
+evaluation score logs will be reported. The `data_dir` should 
+contain the different datasets used for training 
+under separate subdirectories, while the `cache_dir` stores any 
+repeatedly required objects in the training. For instance the
+Mean and Std of the real images while calculating the FID.
+
+Following this, download the inception net weights from 
+[here](https://drive.google.com/uc?id=1MzTY44rLToO5APn8TZmfR7_ENSe5aZUn)
+and place them in `result_dir + "/inception_network/inception_v3_features.pkl"`.
+
+Finally, modify the configurations in the `train.py` as per your 
+situation and start training by just running the `train.py` script.
+
+    (your_virtual_env)$ python train.py
+
+### Opensourced models
 
 ### 6.) How to use pretrained models 
 

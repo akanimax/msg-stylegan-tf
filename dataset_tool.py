@@ -794,7 +794,8 @@ def execute_cmdline(argv):
 
     p = add_command(
         "create_from_images",
-        "Create dataset from a directory full of images.",
+        "Create dataset from a directory full of images. Please be careful"
+        "since the tool recursively searches inside every sub-directory for image files",
         "create_from_images datasets/mydataset myimagedir",
     )
     p.add_argument("tfrecord_dir", help="New dataset directory to be created")

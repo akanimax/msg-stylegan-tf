@@ -20,53 +20,6 @@ fid50k = dnnlib.EasyDict(
     num_images=50000,
     minibatch_per_gpu=8,
 )
-ppl_zfull = dnnlib.EasyDict(
-    func_name="metrics.perceptual_path_length.PPL",
-    name="ppl_zfull",
-    num_samples=100000,
-    epsilon=1e-4,
-    space="z",
-    sampling="full",
-    minibatch_per_gpu=16,
-)
-ppl_wfull = dnnlib.EasyDict(
-    func_name="metrics.perceptual_path_length.PPL",
-    name="ppl_wfull",
-    num_samples=100000,
-    epsilon=1e-4,
-    space="w",
-    sampling="full",
-    minibatch_per_gpu=16,
-)
-ppl_zend = dnnlib.EasyDict(
-    func_name="metrics.perceptual_path_length.PPL",
-    name="ppl_zend",
-    num_samples=100000,
-    epsilon=1e-4,
-    space="z",
-    sampling="end",
-    minibatch_per_gpu=16,
-)
-ppl_wend = dnnlib.EasyDict(
-    func_name="metrics.perceptual_path_length.PPL",
-    name="ppl_wend",
-    num_samples=100000,
-    epsilon=1e-4,
-    space="w",
-    sampling="end",
-    minibatch_per_gpu=16,
-)
-ls = dnnlib.EasyDict(
-    func_name="metrics.linear_separability.LS",
-    name="ls",
-    num_samples=200000,
-    num_keep=100000,
-    attrib_indices=range(40),
-    minibatch_per_gpu=4,
-)
-dummy = dnnlib.EasyDict(
-    func_name="metrics.metric_base.DummyMetric", name="dummy"
-)  # for debugging
 
 # ----------------------------------------------------------------------------
 # Base class for metrics.
