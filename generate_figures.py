@@ -1,23 +1,17 @@
 """Minimal script for reproducing the figures of the StyleGAN paper using pre-trained generators."""
 
-import os
 import pickle
 
 import PIL.Image
+import numpy as np
 
 import config
 import dnnlib
 import dnnlib.tflib as tflib
-import numpy as np
 
 # ----------------------------------------------------------------------------
 # Helpers for loading and using pre-trained generators.
 
-url_ffhq = "https://drive.google.com/uc?id=1MEGjdvVpUsu1jB4zrXZN7Y4kBBOzizDQ"  # karras2019stylegan-ffhq-1024x1024.pkl
-url_celebahq = "https://drive.google.com/uc?id=1MGqJl28pN4t7SAtSrPdSRJSQJqahkzUf"  # karras2019stylegan-celebahq-1024x1024.pkl
-url_bedrooms = "https://drive.google.com/uc?id=1MOSKeGF0FJcivpBI7s63V9YHloUTORiF"  # karras2019stylegan-bedrooms-256x256.pkl
-url_cars = "https://drive.google.com/uc?id=1MJ6iCfNtMIRicihwRorsM3b7mmtmK9c3"  # karras2019stylegan-cars-512x384.pkl
-url_cats = "https://drive.google.com/uc?id=1MQywl0FNt6lHu8E_EUqnRbviagS7fbiJ"  # karras2019stylegan-cats-256x256.pkl
 
 synthesis_kwargs = dict(
     output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True),
@@ -66,7 +60,7 @@ def draw_uncurated_result_figure(png, Gs, cx, cy, cw, ch, rows, lods, seed):
 
 
 def draw_style_mixing_figure(
-    png, Gs, w, h, src_seeds, dst_seeds, style_ranges, **extra_kwargs
+        png, Gs, w, h, src_seeds, dst_seeds, style_ranges, **extra_kwargs
 ):
     print(png)
     src_latents = np.stack(
@@ -205,98 +199,5 @@ def draw_truncation_trick_figure(png, Gs, w, h, seeds, psis):
         for col, image in enumerate(list(row_images)):
             canvas.paste(PIL.Image.fromarray(image, "RGB"), (col * w, row * h))
     canvas.save(png)
-
-
-# ----------------------------------------------------------------------------
-# Main program.
-
-
-def main():
-    tflib.init_tf()
-    os.makedirs(config.result_dir, exist_ok=True)
-    draw_uncurated_result_figure(
-        os.path.join(config.result_dir, "figure02-uncurated-ffhq.png"),
-        load_Gs(url_ffhq),
-        cx=0,
-        cy=0,
-        cw=1024,
-        ch=1024,
-        rows=3,
-        lods=[0, 1, 2, 2, 3, 3],
-        seed=5,
-    )
-    draw_style_mixing_figure(
-        os.path.join(config.result_dir, "figure03-style-mixing.png"),
-        load_Gs(url_ffhq),
-        w=1024,
-        h=1024,
-        src_seeds=[639, 701, 687, 615, 2268],
-        dst_seeds=[888, 829, 1898, 1733, 1614, 845],
-        style_ranges=[range(0, 4)] * 3 + [range(4, 8)] * 2 + [range(8, 18)],
-    )
-    draw_noise_detail_figure(
-        os.path.join(config.result_dir, "figure04-noise-detail.png"),
-        load_Gs(url_ffhq),
-        w=1024,
-        h=1024,
-        num_samples=100,
-        seeds=[1157, 1012],
-    )
-    draw_noise_components_figure(
-        os.path.join(config.result_dir, "figure05-noise-components.png"),
-        load_Gs(url_ffhq),
-        w=1024,
-        h=1024,
-        seeds=[1967, 1555],
-        noise_ranges=[range(0, 18), range(0, 0), range(8, 18), range(0, 8)],
-        flips=[1],
-    )
-    draw_truncation_trick_figure(
-        os.path.join(config.result_dir, "figure08-truncation-trick.png"),
-        load_Gs(url_ffhq),
-        w=1024,
-        h=1024,
-        seeds=[91, 388],
-        psis=[1, 0.7, 0.5, 0, -0.5, -1],
-    )
-    draw_uncurated_result_figure(
-        os.path.join(config.result_dir, "figure10-uncurated-bedrooms.png"),
-        load_Gs(url_bedrooms),
-        cx=0,
-        cy=0,
-        cw=256,
-        ch=256,
-        rows=5,
-        lods=[0, 0, 1, 1, 2, 2, 2],
-        seed=0,
-    )
-    draw_uncurated_result_figure(
-        os.path.join(config.result_dir, "figure11-uncurated-cars.png"),
-        load_Gs(url_cars),
-        cx=0,
-        cy=64,
-        cw=512,
-        ch=384,
-        rows=4,
-        lods=[0, 1, 2, 2, 3, 3],
-        seed=2,
-    )
-    draw_uncurated_result_figure(
-        os.path.join(config.result_dir, "figure12-uncurated-cats.png"),
-        load_Gs(url_cats),
-        cx=0,
-        cy=0,
-        cw=256,
-        ch=256,
-        rows=5,
-        lods=[0, 0, 1, 1, 2, 2, 2],
-        seed=1,
-    )
-
-
-# ----------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    main()
 
 # ----------------------------------------------------------------------------
