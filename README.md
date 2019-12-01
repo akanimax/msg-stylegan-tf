@@ -148,35 +148,57 @@ respectively. Please see the below example.
 
 ### Qualitative examples
 <p align="center">
-<h3> CelebA-HQ </h3>
+<b> CelebA-HQ </b> <br>
 <img alt="CelebA-HQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/celebahq_1.jpg" />
 <br>
 </p>
 
 <p align="center">
-<h3> FFHQ </h3>
+<b> FFHQ </b> <br>
 <img alt="FFHQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ffhq_2.jpg" />
 <br>
 </p>
 
 <p align="center">
-<h3> LSUN Churches </h3>
+<b> LSUN Churches </b> <br>
 <img alt="LSUN Churches" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/churches_3.jpg" />
 <br>
 </p>
 
 <p align="center">
-<h3> Oxford Flowers </h3>
+<b> Oxford Flowers </b> <br>
 <img alt="Oxford Flowers" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/flowers_3.jpg" />
 <br>
 </p>
 
 <p align="center">
-<h3> Indian Celebs </h3>
+<b> Indian Celebs </b> <br>
 <img alt="Indian Celebs" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ic_3.jpg" />
 <br>
 </p>
 
+<p align="center">
+<b> More Full resolution CelebA-HQ samples </b> <br>
+<img alt="full_res_hq_sheet" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/full_res_hq_sheet.png" />
+<br>
+</p>
+
+### Cite our work
+    @article{karnewar2019msg,
+      title={MSG-GAN: Multi-Scale Gradients for Generative Adversarial Networks},
+      author={Karnewar, Animesh and Wang, Oliver},
+      journal={arXiv preprint arXiv:1903.06048},
+      year={2019}
+    }
+
 ### 11.) Other contributors
+Please feel free to open PRs here if 
+you train on other datasets using this architecture. 
+<br>
 
 ### 12.) Thanks and regards
+
+
+
+Best regards, <br>
+@akanimax :)
