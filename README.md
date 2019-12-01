@@ -71,6 +71,14 @@ leaving everything else (mapping network, non-traditional input and
 style adaIN) untouched. The discriminator architecture is same as 
 the ProGANs (and consequently MSG-ProGAN) discriminator.
 
+### System requirements
+
+The code was built and tested for:
+* 64-bit Python 3.6.7 
+* TensorFlow 1.13.1 with GPU support.
+* NVIDIA GPUs with at least 16GB of DRAM. We used variants of the Tesla V100 GPUs.
+* NVIDIA driver 418.56, CUDA toolkit 10.1, cuDNN 7.3.1.
+
 ### How to run the code (Training)
 Training can be run in the following 3 steps:
 
@@ -191,14 +199,19 @@ respectively. Please see the below example.
       year={2019}
     }
 
-### 11.) Other contributors
+### Other contributors
 Please feel free to open PRs here if 
 you train on other datasets using this architecture. 
 <br>
 
-### 12.) Thanks and regards
+### Thanks and regards
 
+#### \[:star: New :star:\] Please check out my new IG handle [@the_GANista](https://www.instagram.com/the_GANista/). I will be posting fun GAN based visual art here. :). 
 
+Thank you all for supporting and encouraging my work. I hope
+this will be useful for your research / project / work.
 
-Best regards, <br>
+As always, any suggestion / feedback / contribution is always welcome :smile:.
+
+Cheers :beers:! <br>
 @akanimax :)
