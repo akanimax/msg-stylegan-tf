@@ -117,17 +117,65 @@ situation and start training by just running the `train.py` script.
 
     (your_virtual_env)$ python train.py
 
-### Opensourced models
+### Pretrained models
 
-### 6.) How to use pretrained models 
+| Dataset        | Size  | GPUs used   | FID score | Link            | 
+| :---           | :---  | :---        | :---      | :---            |
+| LSUN Churches  | ~150K | 8 V100-16GB | 5.20      | [coming soon]() |    
+| Oxford Flowers | ~8K   | 2 V100-32GB | 19.60     | [coming soon]() |
+| Indian Celebs  | ~3K   | 4 V100-32GB | 28.44     | [coming soon]() |
+| CelebA-HQ      | 30K   | 8 V100-16GB | 6.37      | [coming soon]() |
+| FFHQ           | 70K   | 4 V100-32GB | 5.80      | [coming soon]() |
+
+### How to use pretrained models 
+We provide three scripts `generate_multiscale_samples.py`, 
+`generate_samples.py` and `latent_space_interpolation_video.py` 
+which can be used to generate multi-scale generated images grids, 
+highest resolution samples and latent space interpolation video 
+respectively. Please see the below example.
+    
+    (your_virtual_env)$ python latent_space_interpolation_video.py \
+    --pickle_file /home/karnewar/msg-stylegan/00004-msg-stylegan-visual_art-4gpu/best_model.pkl \
+    --output_file /home/karnewar/msg-stylegan/visual_art_interpolation_hd.avi \
+    --num_points 30 \
+    --transition_points 30 \
+    --resize 800 1920 \
 
 ### 7.) How to run evaluation scripts
 
-### 8.) Some more details about stability
+### 8.) Stability and Ease of Use :)
 
-### 9.) Result tables
 
-### 10.) Qualitative examples
+### Qualitative examples
+<p align="center">
+<h3> CelebA-HQ </h3>
+<img alt="CelebA-HQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/celebahq_1.jpg" />
+<br>
+</p>
+
+<p align="center">
+<h3> FFHQ </h3>
+<img alt="FFHQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ffhq_2.jpg" />
+<br>
+</p>
+
+<p align="center">
+<h3> LSUN Churches </h3>
+<img alt="LSUN Churches" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/churches_3.jpg" />
+<br>
+</p>
+
+<p align="center">
+<h3> Oxford Flowers </h3>
+<img alt="Oxford Flowers" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/flowers_3.jpg" />
+<br>
+</p>
+
+<p align="center">
+<h3> Indian Celebs </h3>
+<img alt="Indian Celebs" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ic_3.jpg" />
+<br>
+</p>
 
 ### 11.) Other contributors
 

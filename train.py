@@ -51,7 +51,7 @@ sched.G_lrate = 0.003
 sched.D_lrate = sched.G_lrate
 
 # related to frequency of logs:
-sched.tick_kimg = 100
+sched.tick_kimg = 10
 image_snapshot_ticks = 1
 network_snapshot_ticks = 10
 

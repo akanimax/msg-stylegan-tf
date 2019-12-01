@@ -2,19 +2,20 @@
 
 import argparse
 import glob
-# pylint: disable=too-many-lines
-import os
 import sys
 import threading
 import traceback
 
 import PIL.Image
+import numpy as np
+# pylint: disable=too-many-lines
+import os
 import six.moves.queue as Queue  # pylint: disable=import-error
+import tensorflow as tf
 
 import dnnlib.tflib as tflib
-import numpy as np
-import tensorflow as tf
 from training import dataset
+from scipy.misc import imresize
 
 
 # ----------------------------------------------------------------------------
@@ -602,7 +603,7 @@ def _get_all_files(path):
     return return_list
 
 
-def create_from_images(tfrecord_dir, image_dir, shuffle):
+def create_from_images(tfrecord_dir, image_dir, shuffle, resize=None):
     print('Loading images from "%s"' % image_dir)
     image_filenames = _get_all_files(image_dir)
     print(f"detected {len(image_filenames)} images ...")
@@ -611,10 +612,11 @@ def create_from_images(tfrecord_dir, image_dir, shuffle):
     img = np.asarray(PIL.Image.open(image_filenames[0]))
     resolution = img.shape[0]
     channels = img.shape[2] if img.ndim == 3 else 1
-    if img.shape[1] != resolution:
-        error("Input images must have the same width and height")
-    if resolution != 2 ** int(np.floor(np.log2(resolution))):
-        error("Input image resolution must be a power-of-two")
+    if resize is None:
+        if img.shape[1] != resolution:
+            error("Input images must have the same width and height")
+        if resolution != 2 ** int(np.floor(np.log2(resolution))):
+            error("Input image resolution must be a power-of-two")
     if channels not in [1, 3]:
         error("Input images must be stored as RGB or grayscale")
 
@@ -622,8 +624,12 @@ def create_from_images(tfrecord_dir, image_dir, shuffle):
         order = (
             tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
         )
+        print("Adding the images to tfrecords ...")
         for idx in range(order.size):
             img = np.asarray(PIL.Image.open(image_filenames[order[idx]]))
+            if resize is not None:
+                size = int(2 ** resize)
+                img = imresize(img, (size, size))
             if channels == 1:
                 img = img[np.newaxis, :, :]  # HW => CHW
             else:
@@ -800,6 +806,13 @@ def execute_cmdline(argv):
     )
     p.add_argument("tfrecord_dir", help="New dataset directory to be created")
     p.add_argument("image_dir", help="Directory containing the images")
+    p.add_argument(
+        "--resize",
+        help="resize to given power of 2 sized square images (default: None)",
+        type=int,
+        default=None,
+        required=False
+    )
     p.add_argument(
         "--shuffle", help="Randomize image order (default: 1)", type=int, default=1
     )
