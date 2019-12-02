@@ -12,6 +12,8 @@ from scipy.misc import imresize
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 
+from training.misc import dumb_upsample_nn
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser("StyleGAN image_generator")
@@ -58,7 +60,7 @@ def parse_arguments():
 
     parser.add_argument(
         "--generation_depths",
-        action="append",
+        action="store",
         default=None,
         nargs="+",
         required=False,
@@ -127,7 +129,7 @@ def get_image(
     num_cols=None,
     randomize_noise=False,
 ):
-    fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+    fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=(generation_depths is None))
     point = np.expand_dims(point, axis=0)
     gen_images = generator.run(
         point,
@@ -146,10 +148,22 @@ def get_image(
         assert all(
             i < len(gen_images) for i in generation_depths
         ), "Requested depth cannot be produced"
-        imgs = [np.squeeze(gen_images[i], axis=0) for i in generation_depths]
-        imgs = th.stack([th.tensor(gen_images[i]) for i in generation_depths], dim=0)
+
+        # bring all the images to the size of the highest resolution image
+        highest_res_log_2 = int(np.log2(gen_images[-1].shape[-1]))
+
+        multi_scale_images = [
+            dumb_upsample_nn(
+                images, int(2 ** (highest_res_log_2 - int(np.log2(images.shape[-1]))))
+            )
+            for images in gen_images
+        ]
+
+        imgs = [np.squeeze(multi_scale_images[i], axis=0) for i in generation_depths]
+        imgs = th.stack([th.tensor(img) for img in imgs], dim=0)
         n_cols = num_cols if num_cols is not None else int(np.ceil(sqrt(len(imgs))))
         img = make_grid(imgs, nrow=num_cols, padding=0).cpu().numpy()
+        img = np.transpose(img, (1, 2, 0))
 
     return np.squeeze(img)
 

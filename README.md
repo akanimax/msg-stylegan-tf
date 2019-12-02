@@ -213,6 +213,13 @@ training and subsequently improve the quality of the generated images at all sca
 the generator makes only minimal incremental improvements to the images generated from fixed latent points.
 
 ### Qualitative examples
+
+<p align="center">
+<b> Simultaneous multi-scale latent space interpolation FFHQ [1024 x 1024] </b> <br>
+<img alt="ffhq_multi_scale" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/cut_vid.gif" />
+<br>
+</p>
+
 <p align="center">
 <b> CelebA-HQ [1024 x 1024] </b> <br>
 <img alt="CelebA-HQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/celebahq_1.jpg" />
