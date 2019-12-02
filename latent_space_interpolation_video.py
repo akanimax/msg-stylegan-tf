@@ -106,6 +106,14 @@ def parse_arguments():
         help="value of truncation_psi used for generating the video",
     )
 
+    parser.add_argument(
+        "--fps",
+        action="store",
+        type=int,
+        default=24,
+        help="fps of the generated video",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -199,7 +207,7 @@ def main(args):
     height, width, _ = sample_image_for_shape.shape
 
     video = cv2.VideoWriter(
-        args.output_file, 0, args.transition_points, (width, height)
+        args.output_file, cv2.VideoWriter_fourcc(*'MP4V'), args.fps, (width, height)
     )
 
     for point in tqdm(all_latents):
