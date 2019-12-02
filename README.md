@@ -129,11 +129,11 @@ situation and start training by just running the `train.py` script.
 
 | Dataset        | Size  | GPUs used   | FID score | Link            | 
 | :---           | :---  | :---        | :---      | :---            |
-| LSUN Churches  | ~150K | 8 V100-16GB | 5.20      | [drive link](https://drive.google.com/open?id=1oJDfaKvntxyhECp7eb1qPNmnjJek4R3d) |    
-| Oxford Flowers | ~8K   | 2 V100-32GB | 19.60     | [drive link](https://drive.google.com/open?id=1_GuTi2-ZrY0A3kzAlxLFJdBgYHZRiSCt) |
+| LSUN Churches  | ~150K | 8 V100-16GB | 5.20      | [drive link](https://drive.google.com/open?id=1_GuTi2-ZrY0A3kzAlxLFJdBgYHZRiSCt) |    
+| Oxford Flowers | ~8K   | 2 V100-32GB | 19.60     | [drive link](https://drive.google.com/open?id=1oJDfaKvntxyhECp7eb1qPNmnjJek4R3d) |
 | Indian Celebs  | ~3K   | 4 V100-32GB | 28.44     | [drive link](https://drive.google.com/open?id=1BflibIAA46KwRajKVE3hGo5g6qQ66uqO) |
-| CelebA-HQ      | 30K   | 8 V100-16GB | 6.37      | [drive link](https://drive.google.com/open?id=1hgykdbFRgIacGsAC4jlnUqckAY5lvB6t) |
-| FFHQ           | 70K   | 4 V100-32GB | 5.80      | [drive link](https://drive.google.com/open?id=1IP7J-a3HT7EcuHrb0Qz9fsA2CVTeDz08) |
+| CelebA-HQ      | 30K   | 8 V100-16GB | 6.37      | [drive link](https://drive.google.com/open?id=1IP7J-a3HT7EcuHrb0Qz9fsA2CVTeDz08) |
+| FFHQ           | 70K   | 4 V100-32GB | 5.80      | [drive link](https://drive.google.com/open?id=1hgykdbFRgIacGsAC4jlnUqckAY5lvB6t) |
 
 ### How to use pretrained models 
 We provide three scripts `generate_multiscale_samples.py`, 
