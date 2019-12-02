@@ -127,13 +127,13 @@ situation and start training by just running the `train.py` script.
 
 ### Pretrained models
 
-| Dataset        | Size  | GPUs used   | FID score | Link            | 
-| :---           | :---  | :---        | :---      | :---            |
-| LSUN Churches  | ~150K | 8 V100-16GB | 5.20      | [drive link](https://drive.google.com/open?id=1_GuTi2-ZrY0A3kzAlxLFJdBgYHZRiSCt) |    
-| Oxford Flowers | ~8K   | 2 V100-32GB | 19.60     | [drive link](https://drive.google.com/open?id=1oJDfaKvntxyhECp7eb1qPNmnjJek4R3d) |
-| Indian Celebs  | ~3K   | 4 V100-32GB | 28.44     | [drive link](https://drive.google.com/open?id=1BflibIAA46KwRajKVE3hGo5g6qQ66uqO) |
-| CelebA-HQ      | 30K   | 8 V100-16GB | 6.37      | [drive link](https://drive.google.com/open?id=1IP7J-a3HT7EcuHrb0Qz9fsA2CVTeDz08) |
-| FFHQ           | 70K   | 4 V100-32GB | 5.80      | [drive link](https://drive.google.com/open?id=1hgykdbFRgIacGsAC4jlnUqckAY5lvB6t) |
+| Dataset        | Size  |Resolution| GPUs used   | FID score | Link            | 
+| :---           | :---  |:--- | :---        | :---      | :---            |
+| LSUN Churches  | ~150K |256 x 256| 8 V100-16GB | 5.20      | [drive link](https://drive.google.com/open?id=1_GuTi2-ZrY0A3kzAlxLFJdBgYHZRiSCt) |    
+| Oxford Flowers | ~8K   |256 x 256| 2 V100-32GB | 19.60     | [drive link](https://drive.google.com/open?id=1oJDfaKvntxyhECp7eb1qPNmnjJek4R3d) |
+| Indian Celebs  | ~3K   |256 x 256| 4 V100-32GB | 28.44     | [drive link](https://drive.google.com/open?id=1BflibIAA46KwRajKVE3hGo5g6qQ66uqO) |
+| CelebA-HQ      | 30K   |1024 x 1024| 8 V100-16GB | 6.37      | [drive link](https://drive.google.com/open?id=1IP7J-a3HT7EcuHrb0Qz9fsA2CVTeDz08) |
+| FFHQ           | 70K   |1024 x 1024| 4 V100-32GB | 5.80      | [drive link](https://drive.google.com/open?id=1hgykdbFRgIacGsAC4jlnUqckAY5lvB6t) |
 
 ### How to use pretrained models 
 We provide three scripts `generate_multiscale_samples.py`, 
@@ -214,37 +214,37 @@ the generator makes only minimal incremental improvements to the images generate
 
 ### Qualitative examples
 <p align="center">
-<b> CelebA-HQ </b> <br>
+<b> CelebA-HQ [1024 x 1024] </b> <br>
 <img alt="CelebA-HQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/celebahq_1.jpg" />
 <br>
 </p>
 
 <p align="center">
-<b> FFHQ </b> <br>
+<b> FFHQ [1024 x 1024] </b> <br>
 <img alt="FFHQ" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ffhq_2.jpg" />
 <br>
 </p>
 
 <p align="center">
-<b> LSUN Churches </b> <br>
+<b> LSUN Churches [256 x 256] </b> <br>
 <img alt="LSUN Churches" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/churches_3.jpg" />
 <br>
 </p>
 
 <p align="center">
-<b> Oxford Flowers </b> <br>
+<b> Oxford Flowers [256 x 256] </b> <br>
 <img alt="Oxford Flowers" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/flowers_3.jpg" />
 <br>
 </p>
 
 <p align="center">
-<b> Indian Celebs </b> <br>
+<b> Indian Celebs [256 x 256] </b> <br>
 <img alt="Indian Celebs" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/ic_3.jpg" />
 <br>
 </p>
 
 <p align="center">
-<b> More Full resolution CelebA-HQ samples </b> <br>
+<b> More Full resolution CelebA-HQ samples [1024x 1024] </b> <br>
 <img alt="full_res_hq_sheet" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/full_res_hq_sheet.png" />
 <br>
 </p>
