@@ -197,6 +197,21 @@ stable. We show a juxtaposing experiment for this as follows:
 <br>
 </p>
 
+We quantify the image stability during training. These plots show the MSE between images generated from the same latent code at
+the beginning of sequential epochs (averaged over 36 latent samples) on the CelebA-HQ dataset. MSG-GAN converges
+stably over time while Progressive Growing continues to vary significantly across epochs. Please note that 
+the first half of the epochs are spent in fading in the new layer, but 
+apparently, even for the subsequent epochs, the changes made are quite significant.
+
+<p align="center">
+<img alt="training_explanation" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/modified_synchronization.jpg" />
+<br>
+</p>
+
+During training, all the layers in the MSG-GAN synchronize across the generated resolutions fairly early in the
+training and subsequently improve the quality of the generated images at all scales simultaneously. Throughout the training
+the generator makes only minimal incremental improvements to the images generated from fixed latent points.
+
 ### Qualitative examples
 <p align="center">
 <b> CelebA-HQ </b> <br>
