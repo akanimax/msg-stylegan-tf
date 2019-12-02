@@ -149,10 +149,53 @@ respectively. Please see the below example.
     --transition_points 30 \
     --resize 800 1920 \
 
-### 7.) How to run evaluation scripts
+### How to run evaluation
+The training pipeline already computes the metric during training 
+along with a tensorboard log. But, in case you wish to evaluate
+the trained models again for research baseline (or for some other reason,
+say fast training and separate evaluation), Please use the `run_metrics.py`
+script. Modify the following lines according to your situation:
 
-### 8.) Stability and Ease of Use :)
+    tasks = []
+    tasks += [
+        EasyDict(
+            run_func_name="run_metrics.run_pickle",
+            network_pkl="/home/karnewar/msg-stylegan/00002-msg-stylegan-indian_celebs-4gpu/network-snapshot.pkl",
+            dataset_args=EasyDict(tfrecord_dir="indian_celebs/tfrecords", shuffle_mb=0),
+            mirror_augment=True,
+        )
+    ]  
+    # tasks += [EasyDict(run_func_name='run_metrics.run_snapshot', run_id=100, snapshot=25000)]
+    # tasks += [EasyDict(run_func_name='run_metrics.run_all_snapshots', run_id=100)]
 
+    # How many GPUs to use?
+    submit_config.num_gpus = 1
+    # submit_config.num_gpus = 2
+    # submit_config.num_gpus = 4
+    # submit_config.num_gpus = 8
+
+and run:
+    
+    (your_virtual_env)$ python run_metrics.py
+    
+The `run_snapshot` and `run_pickle` do practically the same thing with
+the minor exception of the usage. The former needs a `snapshot_id` and `run_id`
+and the files are located automatically, whereas the latter needs the pickle file
+to be provided. I personally find the run_pickle much more useful. 
+The `run_all_snapshots` function takes the `run_id` and evaluates 
+all snapshots located in that run_dir.
+
+### Stability and Ease of Use :)
+Usually, it is the case that stability and easy usage are 
+not the terms that you'd use in the context of a GAN :laughing:. 
+But with the multi-scale gradients in the GAN, the training is quite 
+stable. We show a juxtaposing experiment for this as follows:
+
+<p align="center">
+<img alt="progan_stability" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/Combined_1.jpg" width="49%" height="50%"/>
+<img alt="msggan_stability" src="https://github.com/akanimax/msg-stylegan-tf/blob/master/diagrams/Combined_2.jpg" width="49%" height="50%"/>
+<br>
+</p>
 
 ### Qualitative examples
 <p align="center">

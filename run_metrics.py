@@ -80,23 +80,17 @@ def main():
     metric_base.fid50k.update(
         {"inception_net_path": os.path.join(config.result_dir, "inception_network", "inception_v3_features.pkl")})
     metrics += [metric_base.fid50k]
-    # metrics += [metric_base.ppl_zfull]
-    # metrics += [metric_base.ppl_wfull]
-    # metrics += [metric_base.ppl_zend]
-    # metrics += [metric_base.ppl_wend]
-    # metrics += [metric_base.ls]
-    # metrics += [metric_base.dummy]
 
     # Which networks to evaluate them on?
     tasks = []
     tasks += [
         EasyDict(
             run_func_name="run_metrics.run_pickle",
-            network_pkl="/home/karnewar/home2/self/msg-stylegan/00002-msg-stylegan-indian_celebs-4gpu/network-snapshot-001000.pkl",
+            network_pkl="/home/karnewar/msg-stylegan/00002-msg-stylegan-indian_celebs-4gpu/network-snapshot.pkl",
             dataset_args=EasyDict(tfrecord_dir="indian_celebs/tfrecords", shuffle_mb=0),
             mirror_augment=True,
         )
-    ]  # karras2019stylegan-ffhq-1024x1024.pkl
+    ]
     # tasks += [EasyDict(run_func_name='run_metrics.run_snapshot', run_id=100, snapshot=25000)]
     # tasks += [EasyDict(run_func_name='run_metrics.run_all_snapshots', run_id=100)]
 
