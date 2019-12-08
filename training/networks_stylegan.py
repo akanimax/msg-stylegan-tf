@@ -310,7 +310,7 @@ def style_mod(x, dlatent, **kwargs):
         style = tf.reshape(style, [-1, 2, x.shape[1]] + [1] * (len(x.shape) - 2))
         return (
                 x * (style[:, 0] + 1) + style[:, 1]
-        )  # TOOD: check if there is a mistake here.
+        )  # TODO: check if there is a mistake here.
 
 
 # ----------------------------------------------------------------------------
